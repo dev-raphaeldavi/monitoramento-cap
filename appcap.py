@@ -185,7 +185,7 @@ if not df.empty:
         st.markdown("---")
         
         # O ÚNICO BOTÃO QUE VOCÊ PRECISA PARA VER AS MÉTRICAS
-        if st.button("📊 ABRIR PAINEL DE MÉTRICAS", use_container_width=True):
+        if st.button("📊 ABRIR PAINEL DE INDICADORES", use_container_width=True):
             st.session_state.modo_exibicao = 'dashboard'
             st.session_state.input_busca = "" # Limpa a busca para mostrar o painel limpo
         
@@ -282,4 +282,5 @@ if not df.empty:
                 st.markdown(criar_card("Ø Tubo (mm)", ponto.get('Ø TUBO (MM)', ponto.get('Ø TUBO (MM)'))), unsafe_allow_html=True)
 
 else:
+
     st.info("🔄 Carregando dados do servidor Google Drive...")
