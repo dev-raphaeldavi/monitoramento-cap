@@ -1,10 +1,13 @@
 import streamlit as st
 import pandas as pd
+from fpdf import FPDF
+import tempfile
+import os
+from datetime import datetime # Importação necessária para a data no PDF
 
-# 1. CONFIGURAÇÃO DA PÁGINA
+# 1. CONFIGURAÇÃO DA PÁGINA E CONTROLE DE ESTADOS
 st.set_page_config(page_title="Monitor de Captações PISF", page_icon="💧", layout="wide", initial_sidebar_state="expanded")
 
-# Controle de tela (Busca vs Dashboard)
 if 'modo_exibicao' not in st.session_state: st.session_state.modo_exibicao = 'dashboard' 
 if 'input_busca' not in st.session_state: st.session_state.input_busca = ""
 
@@ -19,66 +22,28 @@ st.markdown("""
         --vermelho-irregular: #FF4B4B;
         --fundo-card: #ffffff;
     }
-    
     .stApp { background-color: #FFFFFF !important; }
-    
-    .block-container {
-        padding-top: 2rem !important; 
-        padding-bottom: 1rem !important; 
-        padding-left: 2rem !important;
-        padding-right: 2rem !important;
-        max-width: 98% !important;
-    }
-    
+    .block-container { padding-top: 2rem !important; padding-bottom: 1rem !important; padding-left: 2rem !important; padding-right: 2rem !important; max-width: 98% !important; }
     header[data-testid="stHeader"] { background-color: transparent !important; }
     .stAppDeployButton { display: none !important; }
-    
-    /* DEIXA O BOTÃO DO MENU LATERAL PRETO E VISÍVEL NO CELULAR */
-    [data-testid="collapsedControl"] svg {
-        color: #000000 !important;
-        fill: #000000 !important;
-        stroke: #000000 !important;
-    }
-    [data-testid="collapsedControl"] {
-        background-color: rgba(0,0,0,0.05) !important;
-        border-radius: 5px;
-    }
-    
+    [data-testid="collapsedControl"] svg { color: #000000 !important; fill: #000000 !important; stroke: #000000 !important; }
+    [data-testid="collapsedControl"] { background-color: rgba(0,0,0,0.05) !important; border-radius: 5px; }
     .titulo-principal { color: var(--azul-escuro); font-size: 60px !important; font-weight: 900; margin-top: 0px !important; margin-bottom: 0px !important; padding-bottom: 0px !important; line-height: 1.1; }
     .subtitulo { color: var(--azul-claro); font-size: 30px !important; font-weight: 600; margin-top: 0px !important; margin-bottom: 10px !important; }
-    
     @media (max-width: 768px) {
         .titulo-principal { font-size: 32px !important; text-align: center; }
         .subtitulo { font-size: 18px !important; text-align: center; margin-bottom: 20px !important; }
         .block-container { padding-top: 3.5rem !important; }
     }
-    
-    /* CAIXA DE MÉTRICAS (DASHBOARD) */
-    .metric-box {
-        background: linear-gradient(135deg, #003366 0%, #001a33 100%);
-        border-left: 5px solid #00AEEF;
-        padding: 20px;
-        border-radius: 10px;
-        color: white;
-        text-align: center;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        margin-bottom: 20px;
-        height: 140px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-    }
+    .metric-box { background: linear-gradient(135deg, #003366 0%, #001a33 100%); border-left: 5px solid #00AEEF; padding: 20px; border-radius: 10px; color: white; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; height: 140px; display: flex; flex-direction: column; justify-content: center; }
     .metric-title { font-size: 13px; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; color: #b3e6ff; letter-spacing: 0.5px; }
     .metric-value { font-size: 40px; font-weight: 900; margin: 0; line-height: 1; color: #ffffff; }
-    
-    /* CARDS DE BUSCA */
     .status-card { padding: 25px; border-radius: 12px; color: white; text-align: center; font-size: 1.8rem; font-weight: bold; margin-bottom: 25px; box-shadow: 0 6px 12px rgba(0,0,0,0.15); text-transform: uppercase; letter-spacing: 1px; }
     .status-regular { background-color: var(--verde-regular); }
     .status-irregular { background-color: var(--vermelho-irregular); }
     .info-card { background-color: var(--fundo-card); padding: 20px; border-radius: 10px; border: 1px solid #e0e0e0; border-left: 6px solid var(--azul-claro); box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 15px; height: 100%; }
     .info-label { color: var(--azul-escuro); font-size: 0.9rem; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; }
     .info-value { color: #333333; font-size: 1.2rem; font-weight: 500; }
-    
     .assinatura-app { position: fixed; bottom: 15px; left: 20px; color: #888888; font-size: 14px; font-weight: bold; z-index: 100; }
     </style>
 """, unsafe_allow_html=True)
@@ -86,24 +51,21 @@ st.markdown("""
 # 3. LINK DA PLANILHA
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSQk-RTbvVDPlwxIJFaEKeR1WPRaNSFGioF8DIYD1_mQ-M6a7O20-7TXmx8fBAlDg/pub?gid=502195603&single=true&output=csv"
 
-# 4. FUNÇÃO CAÇADORA DE CABEÇALHOS
+# 4. FUNÇÃO CAÇADORA DE CABEÇALHOS E BLINDAGEM DE DADOS
 @st.cache_data(ttl=60)
 def carregar_dados():
     try:
         df = pd.read_csv(URL_PLANILHA, dtype=str, sep=',', encoding='utf-8-sig', header=None)
-        
         linha_cabecalho = 0
         for index, row in df.iterrows():
-            valores_linha = [str(x).strip().upper() for x in row.values]
-            if 'ID' in valores_linha:
+            if 'ID' in [str(x).strip().upper() for x in row.values]:
                 linha_cabecalho = index
                 break
         
         nomes_limpos = []
         for col in df.iloc[linha_cabecalho].values:
             nome = str(col).replace('\n', ' ').replace('\r', '') 
-            nome = ' '.join(nome.split()).upper() 
-            nomes_limpos.append(nome)
+            nomes_limpos.append(' '.join(nome.split()).upper())
             
         df.columns = nomes_limpos
         df = df.iloc[linha_cabecalho + 1:].reset_index(drop=True)
@@ -113,7 +75,6 @@ def carregar_dados():
             num_contrato = str(row.get('CONTRATO', '')).strip().upper()
             sem_contrato_x = str(row.get('SEM CONTRATO ASSINADO', row.get('SEM CONTRATO', ''))).strip().upper()
             termos_invalidos = ['NAN', 'NÃO ID.', 'NAO ID.', 'NÃO IDENTIFICADO', 'NENHUM', 'NONE', '']
-
             if sem_contrato_x == 'X': return False
             if c_assinado != 'X' and num_contrato in termos_invalidos: return False
             return True
@@ -124,8 +85,82 @@ def carregar_dados():
         st.error(f"Erro ao carregar a planilha: {e}")
         return pd.DataFrame()
 
-# 5. INICIA APP
 df = carregar_dados()
+
+# 5. GERADOR DE PDF CUSTOMIZADO (COM CABEÇALHO GIGANTE E RODAPÉ)
+class PDFRelatorio(FPDF):
+    def footer(self):
+        # Vai para 1.5 cm da borda inferior
+        self.set_y(-15)
+        # Define a fonte do rodapé
+        self.set_font('Arial', 'I', 8)
+        # Pega a data e hora atual
+        data_atual = datetime.now().strftime("%d/%m/%Y às %H:%M")
+        # Imprime o texto no centro da página
+        self.cell(0, 10, f'Gerado em: {data_atual}   |   Página {self.page_no()}', 0, 0, 'C')
+
+def gerar_pdf(df_filtrado, wbs_nome):
+    # Formato L (Landscape/Paisagem)
+    pdf = PDFRelatorio(orientation='L', unit='mm', format='A4')
+    pdf.add_page()
+    
+    # Adiciona a logo 3x maior (w=120) e a centraliza (A4 tem 297mm de largura)
+    # Ponto X para centralizar: (297 - 120) / 2 = 88.5
+    try:
+        pdf.image("logo.png", x=88.5, y=10, w=120)
+    except:
+        pass
+    
+    # Dá um "salto" de 45mm nas linhas para pular a altura da logo gigante
+    pdf.ln(45)
+    
+    def limpar_texto(texto):
+        if pd.isna(texto) or str(texto).strip().upper() in ['NAN', 'NONE', '']: return "-"
+        return str(texto).encode('latin-1', 'replace').decode('latin-1')
+
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(0, 10, limpar_texto(f"Relatório de Captações Irregulares (Em Operação) - WBS: {wbs_nome}"), ln=True, align='C')
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(0, 8, limpar_texto(f"Total de pontos encontrados: {len(df_filtrado)}"), ln=True, align='C')
+    pdf.ln(5)
+    
+    pdf.set_font("Arial", 'B', 9)
+    pdf.set_fill_color(0, 51, 102) 
+    pdf.set_text_color(255, 255, 255)
+    
+    pdf.cell(15, 8, "ID", border=1, fill=True, align='C')
+    pdf.cell(75, 8, "NOME DO PROPRIETARIO", border=1, fill=True, align='C')
+    pdf.cell(20, 8, "ESTACA", border=1, fill=True, align='C')
+    pdf.cell(50, 8, "COORDENADAS", border=1, fill=True, align='C')
+    pdf.cell(20, 8, "ZONA", border=1, fill=True, align='C')
+    pdf.cell(20, 8, "LADO", border=1, fill=True, align='C')
+    pdf.cell(75, 8, "SITUACAO", border=1, fill=True, align='C')
+    pdf.ln()
+
+    pdf.set_font("Arial", '', 8)
+    pdf.set_text_color(0, 0, 0)
+    
+    for _, row in df_filtrado.iterrows():
+        coord = f"{limpar_texto(row.get('LAT'))} / {limpar_texto(row.get('LONG'))}"
+        
+        pdf.cell(15, 8, limpar_texto(row.get('ID')), border=1, align='C')
+        nome = limpar_texto(row.get('PROPRIETÁRIO'))[:45]
+        pdf.cell(75, 8, nome, border=1)
+        pdf.cell(20, 8, limpar_texto(row.get('ESTACA')), border=1, align='C')
+        pdf.cell(50, 8, coord, border=1, align='C')
+        pdf.cell(20, 8, limpar_texto(row.get('ZONA')), border=1, align='C')
+        pdf.cell(20, 8, limpar_texto(row.get('LADO')), border=1, align='C')
+        
+        sit = limpar_texto(row.get('SITUAÇÃO'))[:45]
+        pdf.cell(75, 8, sit, border=1, align='C')
+        pdf.ln()
+    
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        pdf.output(tmp.name, 'F')
+        with open(tmp.name, "rb") as f:
+            pdf_bytes = f.read()
+    os.remove(tmp.name)
+    return pdf_bytes
 
 # 6. CABEÇALHO DA INTERFACE
 col_texto, col_logo = st.columns([1.8, 1]) 
@@ -141,13 +176,11 @@ st.markdown("---")
 
 if not df.empty:
     
-    # EXTRATOR BLINDADO
     def extrator_seguro(dataframe, nomes_possiveis):
         for nome in nomes_possiveis:
             if nome in dataframe.columns:
                 coluna = dataframe[nome]
-                if isinstance(coluna, pd.DataFrame): 
-                    coluna = coluna.iloc[:, 0]
+                if isinstance(coluna, pd.DataFrame): coluna = coluna.iloc[:, 0]
                 return coluna.fillna('').astype(str).str.upper()
         return pd.Series([''] * len(dataframe), index=dataframe.index)
 
@@ -156,7 +189,6 @@ if not df.empty:
     serie_sistema = extrator_seguro(df, ['SISTEMA'])
     serie_locais = serie_eixo + " " + serie_sistema 
 
-    # Lógica Matemática Segura
     mask_reg = df['IS_REGULAR'] == True
     mask_irreg = df['IS_REGULAR'] == False
     mask_operando = serie_sit.str.contains('OPERA', na=False)
@@ -166,7 +198,7 @@ if not df.empty:
 
     # 7. BARRA LATERAL (MENU)
     with st.sidebar:
-        st.markdown(f"<h2 style='color: #003366; margin-bottom:5px;'>🔍 Buscar Captação</h2>", unsafe_allow_html=True)
+        st.markdown(f"<h2 style='color: #ffa500; margin-bottom:5px;'>🔍 Buscar Captação</h2>", unsafe_allow_html=True)
         tipo_busca = st.radio("Método de busca:", ["Por ID", "Por Proprietário", "Por Estrutura (WBS)"], label_visibility="collapsed")
         
         busca = st.text_input("Digite aqui e tecle ENTER:")
@@ -176,32 +208,54 @@ if not df.empty:
             
         st.markdown("---")
         
-        if st.button("📊 ABRIR PAINEL DE MÉTRICAS", use_container_width=True):
+        if st.button("📊 ABRIR PAINEL DE INDICADORES", use_container_width=True):
             st.session_state.modo_exibicao = 'dashboard'
             st.session_state.input_busca = "" 
         
+        st.markdown("---")
+        
+        # SESSÃO GERADOR DE PDF
+        st.markdown(f"<h2 style='color: #ffa500; margin-bottom:5px;'>📄 Relatório: Irregulares em Operação</h2>", unsafe_allow_html=True)
+        st.caption("Digite a WBS para baixar a lista em PDF.")
+        wbs_relatorio = st.text_input("Estrutura (WBS):", key="wbs_pdf")
+        
+        if wbs_relatorio.strip() != "":
+            col_wbs = extrator_seguro(df, ['ESTRUTURA (WBS)', 'ESTRUTURA'])
+            # 🚨 FILTRO TRIPLO: Busca a WBS pesquisada + Irregular + Em Operação
+            df_irregulares_wbs = df[(col_wbs.str.contains(wbs_relatorio.strip(), case=False, na=False)) & (df['IS_REGULAR'] == False) & (mask_operando)]
+            
+            if df_irregulares_wbs.empty:
+                st.warning(f"Nenhum ponto IRREGULAR EM OPERAÇÃO encontrado para a WBS {wbs_relatorio.strip()}.")
+            else:
+                st.success(f"Encontrados {len(df_irregulares_wbs)} pontos irregulares em operação.")
+                pdf_bytes = gerar_pdf(df_irregulares_wbs, wbs_relatorio.strip())
+                
+                st.download_button(
+                    label=f"📥 Baixar Relatório PDF",
+                    data=pdf_bytes,
+                    file_name=f"Irregulares_Operando_WBS_{wbs_relatorio.strip()}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+        
         st.caption(f"<div style='margin-top:20px'>Base Total: **{len(df)} registros**</div>", unsafe_allow_html=True)
-        st.markdown('<div class="assinatura-app">App por Raphael Davi - Versão 1.0</div>', unsafe_allow_html=True)
+        # Assinatura de volta ao original, com a versão A.
+        st.markdown('<div class="assinatura-app">App por Raphael Davi - Versão 1.0 A</div>', unsafe_allow_html=True)
 
     # ==========================================================
     # TELA 1: DASHBOARD
     # ==========================================================
     if st.session_state.modo_exibicao == 'dashboard':
         st.markdown("<h2 style='color: #00AEEF;'>Painel Geral de Indicadores</h2>", unsafe_allow_html=True)
-        
-        def card_metrica(titulo, valor):
-            return f'<div class="metric-box"><div class="metric-title">{titulo}</div><div class="metric-value">{valor}</div></div>'
-            
+        def card_metrica(titulo, valor): return f'<div class="metric-box"><div class="metric-title">{titulo}</div><div class="metric-value">{valor}</div></div>'
         colA, colB, colC = st.columns(3)
         with colA: st.markdown(card_metrica("QUANTIDADE DE PONTOS", len(df)), unsafe_allow_html=True)
         with colB: st.markdown(card_metrica("TOTAL COM CONTRATO", len(df[mask_reg])), unsafe_allow_html=True)
         with colC: st.markdown(card_metrica("TOTAL SEM CONTRATO", len(df[mask_irreg])), unsafe_allow_html=True)
-        
         colD, colE, colF = st.columns(3)
         with colD: st.markdown(card_metrica("TOTAL COM CONTRATO (OPERANDO)", len(df[mask_reg & mask_operando])), unsafe_allow_html=True)
         with colE: st.markdown(card_metrica("TOTAL COM CONTRATO (DESATIVADO)", len(df[mask_reg & mask_inativas])), unsafe_allow_html=True)
         with colF: st.markdown(card_metrica("TOTAL SEM CONTRATO (OPERANDO)", len(df[mask_irreg & mask_operando])), unsafe_allow_html=True)
-        
         colG, colH, colI = st.columns(3)
         with colG: st.markdown(card_metrica("TOTAL SEM CONTRATO (NÃO INSTALADO)", len(df[mask_irreg & mask_inativas])), unsafe_allow_html=True)
         with colH: st.markdown(card_metrica("TOTAL DE PONTOS RAMAL DO AGRESTE", len(df[mask_agreste])), unsafe_allow_html=True)
@@ -213,8 +267,7 @@ if not df.empty:
     elif st.session_state.modo_exibicao == 'busca' and st.session_state.input_busca.strip() != "":
         termo = st.session_state.input_busca.strip()
         
-        if tipo_busca == "Por ID":
-            resultados = df[df['ID'].astype(str).str.strip() == termo]
+        if tipo_busca == "Por ID": resultados = df[df['ID'].astype(str).str.strip() == termo]
         elif tipo_busca == "Por Proprietário":
             col_prop = extrator_seguro(df, ['PROPRIETÁRIO', 'PROPRIETARIO'])
             resultados = df[col_prop.str.contains(termo, case=False, na=False)]
@@ -226,28 +279,23 @@ if not df.empty:
             st.warning(f"⚠️ Nenhum registro encontrado para '{termo}'. Verifique a digitação.")
         else:
             if len(resultados) > 1:
-                # LÓGICA EXCLUSIVA PARA A BUSCA POR WBS COM RESUMO DE MÉTRICAS NA LINHA
                 if tipo_busca == "Por Estrutura (WBS)":
                     qtd_com = len(resultados[resultados['IS_REGULAR'] == True])
                     qtd_sem = len(resultados[resultados['IS_REGULAR'] == False])
-                    
-                    # Puxa a situação específica apenas dessa WBS
                     col_sit_res = extrator_seguro(resultados, ['SITUAÇÃO', 'SITUACAO'])
                     qtd_op = len(resultados[col_sit_res.str.contains('OPERA', na=False)])
-                    
-                    st.info(f"🔍 Encontramos **{len(resultados)}** captações correspondentes ({qtd_com} COM CONTRATO, {qtd_sem} SEM CONTRATO E {qtd_op} EM OPERAÇÃO). Selecione uma na lista abaixo:")
+                    st.info(f"🔍 Encontramos **{len(resultados)}** pontos correspondentes ({qtd_com} COM CONTRATO, {qtd_sem} SEM CONTRATO E {qtd_op} EM OPERAÇÃO). Selecione uma na lista abaixo:")
                 else:
-                    st.info(f"🔍 Encontramos **{len(resultados)}** captações correspondentes. Selecione uma na lista abaixo:")
+                    st.info(f"🔍 Encontramos **{len(resultados)}** pontos correspondentes. Selecione uma na lista abaixo:")
                     
                 opcoes_lista = [(idx, f"ID: {row.get('ID', '-')} | Nome: {row.get('PROPRIETÁRIO', '-')} | WBS: {row.get('ESTRUTURA (WBS)', '-')}") for idx, row in resultados.iterrows()]
                 escolha = st.selectbox("Lista de Resultados:", opcoes_lista, format_func=lambda x: x[1])
                 ponto = resultados.loc[escolha[0]]
             else:
                 ponto = resultados.iloc[0]
-                if tipo_busca != "Por ID": st.success("✅ Apenas 1 captação encontrada! Mostrando detalhes abaixo.")
+                if tipo_busca != "Por ID": st.success("✅ Apenas 1 ponto encontrado! Mostrando detalhes abaixo.")
 
             st.markdown("---")
-            
             is_regular = ponto['IS_REGULAR']
             num_contrato = str(ponto.get('CONTRATO', '')).strip().upper()
             termos_invalidos = ['NAN', 'NÃO ID.', 'NAO ID.', 'NÃO IDENTIFICADO', 'NENHUM', 'NONE', '']
@@ -263,7 +311,6 @@ if not df.empty:
                 return f'<div class="info-card"><div class="info-label">{label}</div><div class="info-value">{valor}</div></div>'
 
             col1, col2, col3 = st.columns(3)
-
             with col1:
                 st.markdown(criar_card("Proprietário", ponto.get('PROPRIETÁRIO')), unsafe_allow_html=True)
                 st.markdown(criar_card("Situação Operacional", ponto.get('SITUAÇÃO')), unsafe_allow_html=True)
