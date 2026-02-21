@@ -87,17 +87,16 @@ def carregar_dados():
 
 df = carregar_dados()
 
-# 5. GERADOR DE PDF CUSTOMIZADO (COM CABEÇALHO GIGANTE E RODAPÉ)
+# 5. GERADOR DE PDF 100% COMPATÍVEL COM NUVEM (LINUX/WINDOWS)
 class PDFRelatorio(FPDF):
     def footer(self):
-        # Vai para 1.5 cm da borda inferior
         self.set_y(-15)
-        self.set_font('Arial', 'I', 8)
+        self.set_font('Helvetica', 'I', 8) # 🚨 Fonte Universal (Evita erro no Linux)
         data_atual = datetime.now().strftime("%d/%m/%Y às %H:%M")
-        self.cell(0, 10, f'Gerado em: {data_atual}   |   Página {self.page_no()}', 0, 0, 'C')
+        # 🚨 Formatação segura para FPDF2
+        self.cell(w=0, h=10, txt=f'Gerado em: {data_atual}   |   Página {self.page_no()}', align='C')
 
 def gerar_pdf(df_filtrado, wbs_nome):
-    # 🚨 CORREÇÃO: Removidos parâmetros extras que causam erro no servidor, deixando apenas a orientação Paisagem (L)
     pdf = PDFRelatorio(orientation='L')
     pdf.add_page()
     
@@ -112,45 +111,47 @@ def gerar_pdf(df_filtrado, wbs_nome):
         if pd.isna(texto) or str(texto).strip().upper() in ['NAN', 'NONE', '']: return "-"
         return str(texto).encode('latin-1', 'replace').decode('latin-1')
 
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(0, 10, limpar_texto(f"Relatório de Captações Irregulares (Em Operação) - WBS: {wbs_nome}"), ln=True, align='C')
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 8, limpar_texto(f"Total de pontos encontrados: {len(df_filtrado)}"), ln=True, align='C')
+    # 🚨 Usando Helvetica em tudo
+    pdf.set_font("Helvetica", 'B', 16)
+    pdf.cell(w=0, h=10, txt=limpar_texto(f"Relatório de Captações Irregulares (Em Operação) - WBS: {wbs_nome}"), ln=1, align='C')
+    pdf.set_font("Helvetica", 'B', 12)
+    pdf.cell(w=0, h=8, txt=limpar_texto(f"Total de pontos encontrados: {len(df_filtrado)}"), ln=1, align='C')
     pdf.ln(5)
     
-    pdf.set_font("Arial", 'B', 9)
+    pdf.set_font("Helvetica", 'B', 9)
     pdf.set_fill_color(0, 51, 102) 
     pdf.set_text_color(255, 255, 255)
     
-    pdf.cell(15, 8, "ID", border=1, fill=True, align='C')
-    pdf.cell(75, 8, "NOME DO PROPRIETARIO", border=1, fill=True, align='C')
-    pdf.cell(20, 8, "ESTACA", border=1, fill=True, align='C')
-    pdf.cell(50, 8, "COORDENADAS", border=1, fill=True, align='C')
-    pdf.cell(20, 8, "ZONA", border=1, fill=True, align='C')
-    pdf.cell(20, 8, "LADO", border=1, fill=True, align='C')
-    pdf.cell(75, 8, "SITUACAO", border=1, fill=True, align='C')
+    pdf.cell(w=15, h=8, txt="ID", border=1, fill=True, align='C')
+    pdf.cell(w=75, h=8, txt="NOME DO PROPRIETARIO", border=1, fill=True, align='C')
+    pdf.cell(w=20, h=8, txt="ESTACA", border=1, fill=True, align='C')
+    pdf.cell(w=50, h=8, txt="COORDENADAS", border=1, fill=True, align='C')
+    pdf.cell(w=20, h=8, txt="ZONA", border=1, fill=True, align='C')
+    pdf.cell(w=20, h=8, txt="LADO", border=1, fill=True, align='C')
+    pdf.cell(w=75, h=8, txt="SITUACAO", border=1, fill=True, align='C')
     pdf.ln()
 
-    pdf.set_font("Arial", '', 8)
+    pdf.set_font("Helvetica", '', 8)
     pdf.set_text_color(0, 0, 0)
     
     for _, row in df_filtrado.iterrows():
         coord = f"{limpar_texto(row.get('LAT'))} / {limpar_texto(row.get('LONG'))}"
         
-        pdf.cell(15, 8, limpar_texto(row.get('ID')), border=1, align='C')
+        pdf.cell(w=15, h=8, txt=limpar_texto(row.get('ID')), border=1, align='C')
         nome = limpar_texto(row.get('PROPRIETÁRIO'))[:45]
-        pdf.cell(75, 8, nome, border=1)
-        pdf.cell(20, 8, limpar_texto(row.get('ESTACA')), border=1, align='C')
-        pdf.cell(50, 8, coord, border=1, align='C')
-        pdf.cell(20, 8, limpar_texto(row.get('ZONA')), border=1, align='C')
-        pdf.cell(20, 8, limpar_texto(row.get('LADO')), border=1, align='C')
+        pdf.cell(w=75, h=8, txt=nome, border=1)
+        pdf.cell(w=20, h=8, txt=limpar_texto(row.get('ESTACA')), border=1, align='C')
+        pdf.cell(w=50, h=8, txt=coord, border=1, align='C')
+        pdf.cell(w=20, h=8, txt=limpar_texto(row.get('ZONA')), border=1, align='C')
+        pdf.cell(w=20, h=8, txt=limpar_texto(row.get('LADO')), border=1, align='C')
         
         sit = limpar_texto(row.get('SITUAÇÃO'))[:45]
-        pdf.cell(75, 8, sit, border=1, align='C')
+        pdf.cell(w=75, h=8, txt=sit, border=1, align='C')
         pdf.ln()
     
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-        pdf.output(tmp.name, 'F')
+        # 🚨 REMOVIDA A LETRA 'F' DAQUI PARA NÃO TRAVAR O LINUX
+        pdf.output(tmp.name)
         with open(tmp.name, "rb") as f:
             pdf_bytes = f.read()
     os.remove(tmp.name)
@@ -208,7 +209,6 @@ if not df.empty:
         
         st.markdown("---")
         
-        # SESSÃO GERADOR DE PDF
         st.markdown(f"<h2 style='color: #ffa500; margin-bottom:5px;'>📄 Relatório: Irregulares em Operação</h2>", unsafe_allow_html=True)
         st.caption("Digite a WBS para baixar a lista em PDF.")
         wbs_relatorio = st.text_input("Estrutura (WBS):", key="wbs_pdf")
