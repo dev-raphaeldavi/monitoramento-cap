@@ -3,7 +3,7 @@ import pandas as pd
 from fpdf import FPDF
 import tempfile
 import os
-from datetime import datetime # Importação necessária para a data no PDF
+from datetime import datetime
 
 # 1. CONFIGURAÇÃO DA PÁGINA E CONTROLE DE ESTADOS
 st.set_page_config(page_title="Monitor de Captações PISF", page_icon="💧", layout="wide", initial_sidebar_state="expanded")
@@ -92,26 +92,20 @@ class PDFRelatorio(FPDF):
     def footer(self):
         # Vai para 1.5 cm da borda inferior
         self.set_y(-15)
-        # Define a fonte do rodapé
         self.set_font('Arial', 'I', 8)
-        # Pega a data e hora atual
         data_atual = datetime.now().strftime("%d/%m/%Y às %H:%M")
-        # Imprime o texto no centro da página
         self.cell(0, 10, f'Gerado em: {data_atual}   |   Página {self.page_no()}', 0, 0, 'C')
 
 def gerar_pdf(df_filtrado, wbs_nome):
-    # Formato L (Landscape/Paisagem)
-    pdf = PDFRelatorio(orientation='L', unit='mm', format='A4')
+    # 🚨 CORREÇÃO: Removidos parâmetros extras que causam erro no servidor, deixando apenas a orientação Paisagem (L)
+    pdf = PDFRelatorio(orientation='L')
     pdf.add_page()
     
-    # Adiciona a logo 3x maior (w=120) e a centraliza (A4 tem 297mm de largura)
-    # Ponto X para centralizar: (297 - 120) / 2 = 88.5
     try:
         pdf.image("logo.png", x=88.5, y=10, w=120)
     except:
         pass
     
-    # Dá um "salto" de 45mm nas linhas para pular a altura da logo gigante
     pdf.ln(45)
     
     def limpar_texto(texto):
@@ -221,7 +215,6 @@ if not df.empty:
         
         if wbs_relatorio.strip() != "":
             col_wbs = extrator_seguro(df, ['ESTRUTURA (WBS)', 'ESTRUTURA'])
-            # 🚨 FILTRO TRIPLO: Busca a WBS pesquisada + Irregular + Em Operação
             df_irregulares_wbs = df[(col_wbs.str.contains(wbs_relatorio.strip(), case=False, na=False)) & (df['IS_REGULAR'] == False) & (mask_operando)]
             
             if df_irregulares_wbs.empty:
@@ -239,7 +232,6 @@ if not df.empty:
                 )
         
         st.caption(f"<div style='margin-top:20px'>Base Total: **{len(df)} registros**</div>", unsafe_allow_html=True)
-        # Assinatura de volta ao original, com a versão A.
         st.markdown('<div class="assinatura-app">App por Raphael Davi - Versão 1.0 A</div>', unsafe_allow_html=True)
 
     # ==========================================================
