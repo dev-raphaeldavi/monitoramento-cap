@@ -87,16 +87,23 @@ def carregar_dados():
 
 df = carregar_dados()
 
-# 5. GERADOR DE PDF 100% COMPATÍVEL COM NUVEM (LINUX/WINDOWS)
+def extrator_seguro(dataframe, nomes_possiveis):
+    for nome in nomes_possiveis:
+        if nome in dataframe.columns:
+            coluna = dataframe[nome]
+            if isinstance(coluna, pd.DataFrame): coluna = coluna.iloc[:, 0]
+            return coluna.fillna('').astype(str).str.upper()
+    return pd.Series([''] * len(dataframe), index=dataframe.index)
+
+# 5. GERADOR DE PDF CUSTOMIZADO E DINÂMICO
 class PDFRelatorio(FPDF):
     def footer(self):
         self.set_y(-15)
-        self.set_font('Helvetica', 'I', 8) # 🚨 Fonte Universal (Evita erro no Linux)
+        self.set_font('Helvetica', 'I', 8) 
         data_atual = datetime.now().strftime("%d/%m/%Y às %H:%M")
-        # 🚨 Formatação segura para FPDF2
         self.cell(w=0, h=10, txt=f'Gerado em: {data_atual}   |   Página {self.page_no()}', align='C')
 
-def gerar_pdf(df_filtrado, wbs_nome):
+def gerar_pdf(df_filtrado, wbs_nome, subtitulo):
     pdf = PDFRelatorio(orientation='L')
     pdf.add_page()
     
@@ -111,12 +118,17 @@ def gerar_pdf(df_filtrado, wbs_nome):
         if pd.isna(texto) or str(texto).strip().upper() in ['NAN', 'NONE', '']: return "-"
         return str(texto).encode('latin-1', 'replace').decode('latin-1')
 
-    # 🚨 Usando Helvetica em tudo
+    titulo = f"Relatório de Captações - WBS: {wbs_nome}" if wbs_nome else "Relatório Geral de Captações (Toda a Obra)"
+    
     pdf.set_font("Helvetica", 'B', 16)
-    pdf.cell(w=0, h=10, txt=limpar_texto(f"Relatório de Captações Irregulares (Em Operação) - WBS: {wbs_nome}"), ln=1, align='C')
+    pdf.cell(w=0, h=10, txt=limpar_texto(titulo), ln=1, align='C')
+    pdf.set_font("Helvetica", 'B', 10)
+    pdf.set_text_color(100, 100, 100)
+    pdf.cell(w=0, h=6, txt=limpar_texto(f"Filtros aplicados: {subtitulo}"), ln=1, align='C')
     pdf.set_font("Helvetica", 'B', 12)
+    pdf.set_text_color(0, 0, 0)
     pdf.cell(w=0, h=8, txt=limpar_texto(f"Total de pontos encontrados: {len(df_filtrado)}"), ln=1, align='C')
-    pdf.ln(5)
+    pdf.ln(3)
     
     pdf.set_font("Helvetica", 'B', 9)
     pdf.set_fill_color(0, 51, 102) 
@@ -136,21 +148,16 @@ def gerar_pdf(df_filtrado, wbs_nome):
     
     for _, row in df_filtrado.iterrows():
         coord = f"{limpar_texto(row.get('LAT'))} / {limpar_texto(row.get('LONG'))}"
-        
         pdf.cell(w=15, h=8, txt=limpar_texto(row.get('ID')), border=1, align='C')
-        nome = limpar_texto(row.get('PROPRIETÁRIO'))[:45]
-        pdf.cell(w=75, h=8, txt=nome, border=1)
+        pdf.cell(w=75, h=8, txt=limpar_texto(row.get('PROPRIETÁRIO'))[:45], border=1)
         pdf.cell(w=20, h=8, txt=limpar_texto(row.get('ESTACA')), border=1, align='C')
         pdf.cell(w=50, h=8, txt=coord, border=1, align='C')
         pdf.cell(w=20, h=8, txt=limpar_texto(row.get('ZONA')), border=1, align='C')
         pdf.cell(w=20, h=8, txt=limpar_texto(row.get('LADO')), border=1, align='C')
-        
-        sit = limpar_texto(row.get('SITUAÇÃO'))[:45]
-        pdf.cell(w=75, h=8, txt=sit, border=1, align='C')
+        pdf.cell(w=75, h=8, txt=limpar_texto(row.get('SITUAÇÃO'))[:45], border=1, align='C')
         pdf.ln()
     
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-        # 🚨 REMOVIDA A LETRA 'F' DAQUI PARA NÃO TRAVAR O LINUX
         pdf.output(tmp.name)
         with open(tmp.name, "rb") as f:
             pdf_bytes = f.read()
@@ -171,14 +178,6 @@ st.markdown("---")
 
 if not df.empty:
     
-    def extrator_seguro(dataframe, nomes_possiveis):
-        for nome in nomes_possiveis:
-            if nome in dataframe.columns:
-                coluna = dataframe[nome]
-                if isinstance(coluna, pd.DataFrame): coluna = coluna.iloc[:, 0]
-                return coluna.fillna('').astype(str).str.upper()
-        return pd.Series([''] * len(dataframe), index=dataframe.index)
-
     serie_sit = extrator_seguro(df, ['SITUAÇÃO', 'SITUACAO'])
     serie_eixo = extrator_seguro(df, ['EIXO'])
     serie_sistema = extrator_seguro(df, ['SISTEMA'])
@@ -191,7 +190,7 @@ if not df.empty:
     mask_agreste = serie_locais.str.contains('AGRESTE', na=False)
     mask_leste = serie_locais.str.contains('LESTE', na=False)
 
-    # 7. BARRA LATERAL (MENU)
+    # 7. BARRA LATERAL (MENU E GERADOR DE RELATÓRIOS)
     with st.sidebar:
         st.markdown(f"<h2 style='color: #ffa500; margin-bottom:5px;'>🔍 Buscar Captação</h2>", unsafe_allow_html=True)
         tipo_busca = st.radio("Método de busca:", ["Por ID", "Por Proprietário", "Por Estrutura (WBS)"], label_visibility="collapsed")
@@ -209,30 +208,55 @@ if not df.empty:
         
         st.markdown("---")
         
-        st.markdown(f"<h2 style='color: #ffa500; margin-bottom:5px;'>📄 Relatório: Irregulares em Operação</h2>", unsafe_allow_html=True)
-        st.caption("Digite a WBS para baixar a lista em PDF.")
-        wbs_relatorio = st.text_input("Estrutura (WBS):", key="wbs_pdf")
+        # ==========================================================
+        # NOVO GERADOR DE RELATÓRIOS AVANÇADO (VERSÃO 1.0 B)
+        # ==========================================================
+        st.markdown(f"<h2 style='color: #ffa500; margin-bottom:5px;'>📄 Central de Relatórios</h2>", unsafe_allow_html=True)
         
-        if wbs_relatorio.strip() != "":
-            col_wbs = extrator_seguro(df, ['ESTRUTURA (WBS)', 'ESTRUTURA'])
-            df_irregulares_wbs = df[(col_wbs.str.contains(wbs_relatorio.strip(), case=False, na=False)) & (df['IS_REGULAR'] == False) & (mask_operando)]
+        with st.expander("🛠️ Abrir Filtros de Relatório", expanded=True):
+            wbs_relatorio = st.text_input("Estrutura (WBS) - Opcional:", placeholder="Deixe em branco para GERAL")
+            filtro_contrato = st.selectbox("Contrato:", ["Todos", "Apenas Regulares", "Apenas Irregulares"])
+            filtro_operacao = st.selectbox("Situação:", ["Todas", "Em Operação", "Inativos/Desativados"])
             
-            if df_irregulares_wbs.empty:
-                st.warning(f"Nenhum ponto IRREGULAR EM OPERAÇÃO encontrado para a WBS {wbs_relatorio.strip()}.")
-            else:
-                st.success(f"Encontrados {len(df_irregulares_wbs)} pontos irregulares em operação.")
-                pdf_bytes = gerar_pdf(df_irregulares_wbs, wbs_relatorio.strip())
+            if st.button("⚙️ Processar e Gerar PDF", use_container_width=True):
+                # 1. Filtro de WBS
+                df_pdf = df.copy()
+                if wbs_relatorio.strip() != "":
+                    col_wbs = extrator_seguro(df_pdf, ['ESTRUTURA (WBS)', 'ESTRUTURA'])
+                    df_pdf = df_pdf[col_wbs.str.contains(wbs_relatorio.strip(), case=False, na=False)]
                 
-                st.download_button(
-                    label=f"📥 Baixar Relatório PDF",
-                    data=pdf_bytes,
-                    file_name=f"Irregulares_Operando_WBS_{wbs_relatorio.strip()}.pdf",
-                    mime="application/pdf",
-                    use_container_width=True
-                )
+                # 2. Filtro de Contrato
+                if filtro_contrato == "Apenas Regulares": df_pdf = df_pdf[df_pdf['IS_REGULAR'] == True]
+                elif filtro_contrato == "Apenas Irregulares": df_pdf = df_pdf[df_pdf['IS_REGULAR'] == False]
+                
+                # 3. Filtro Operacional
+                sit_pdf = extrator_seguro(df_pdf, ['SITUAÇÃO', 'SITUACAO'])
+                if filtro_operacao == "Em Operação":
+                    df_pdf = df_pdf[sit_pdf.str.contains('OPERA', na=False)]
+                elif filtro_operacao == "Inativos/Desativados":
+                    df_pdf = df_pdf[sit_pdf.str.contains('DESATI|NÃO INST|NAO INST', na=False)]
+                
+                # 4. ORDENAÇÃO CRESCENTE POR ESTACA (Regra de Ouro Versão 1.0 B)
+                df_pdf['TEMP_ESTACA'] = extrator_seguro(df_pdf, ['ESTACA'])
+                df_pdf = df_pdf.sort_values(by='TEMP_ESTACA')
+                
+                if df_pdf.empty:
+                    st.error("Nenhum ponto encontrado com esses filtros.")
+                else:
+                    st.success(f"Pronto! {len(df_pdf)} pontos processados.")
+                    subtitulo = f"Contrato: {filtro_contrato} | Operação: {filtro_operacao} | Ordem: Estaca"
+                    pdf_bytes = gerar_pdf(df_pdf, wbs_relatorio.strip(), subtitulo)
+                    
+                    st.download_button(
+                        label=f"📥 BAIXAR PDF AGORA",
+                        data=pdf_bytes,
+                        file_name=f"Relatorio_{'WBS_'+wbs_relatorio.strip() if wbs_relatorio.strip() else 'GERAL'}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True
+                    )
         
         st.caption(f"<div style='margin-top:20px'>Base Total: **{len(df)} registros**</div>", unsafe_allow_html=True)
-        st.markdown('<div class="assinatura-app">App por Raphael Davi - Versão 1.0 A</div>', unsafe_allow_html=True)
+        st.markdown('<div class="assinatura-app">App por Raphael Davi - Versão 1.0 B</div>', unsafe_allow_html=True)
 
     # ==========================================================
     # TELA 1: DASHBOARD
@@ -254,7 +278,7 @@ if not df.empty:
         with colI: st.markdown(card_metrica("TOTAL DE PONTOS EIXO LESTE", len(df[mask_leste])), unsafe_allow_html=True)
 
     # ==========================================================
-    # TELA 2: MODO BUSCA TRADICIONAL
+    # TELA 2: MODO BUSCA TRADICIONAL COM NOVOS CAMPOS
     # ==========================================================
     elif st.session_state.modo_exibicao == 'busca' and st.session_state.input_busca.strip() != "":
         termo = st.session_state.input_busca.strip()
@@ -302,6 +326,7 @@ if not df.empty:
                 if pd.isna(valor) or str(valor).strip().upper() in ['NAN', 'NONE', '']: valor = "Não informado"
                 return f'<div class="info-card"><div class="info-label">{label}</div><div class="info-value">{valor}</div></div>'
 
+            # NOVO LAYOUT DE EXIBIÇÃO: 3 COLUNAS + 1 CARD GIGANTE PARA OBSERVAÇÕES
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.markdown(criar_card("Proprietário", ponto.get('PROPRIETÁRIO')), unsafe_allow_html=True)
@@ -317,7 +342,11 @@ if not df.empty:
                 st.markdown(criar_card("Município", ponto.get('MUNICÍPIO')), unsafe_allow_html=True)
                 st.markdown(criar_card("Sistema", ponto.get('SISTEMA')), unsafe_allow_html=True)
                 st.markdown(criar_card("Placa Instalada?", ponto.get('PLACA INSTALADA')), unsafe_allow_html=True)
-                st.markdown(criar_card("Ø Tubo (mm)", ponto.get('Ø TUBO (MM)', ponto.get('Ø TUBO (MM)'))), unsafe_allow_html=True)
+                # COLUNA NOVA
+                st.markdown(criar_card("Material Comprado", ponto.get('MATERIAL COMPRADO')), unsafe_allow_html=True)
+
+            # CARD LARGÃO PARA A OBSERVAÇÃO
+            st.markdown(criar_card("Observação CPISF", ponto.get('OBSERVAÇÃO CPISF', ponto.get('OBSERVACAO CPISF'))), unsafe_allow_html=True)
 
 else:
     st.info("🔄 Carregando dados do servidor Google Drive...")
