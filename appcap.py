@@ -18,6 +18,7 @@ st.markdown("""
         --azul-escuro: #003366;
         --azul-claro: #00AEEF;
         --laranja: #F7941E;
+        --laranja-escuro: #D46A00; /* Novo tom para aparecer no tema claro do celular */
         --verde-regular: #28A745;
         --vermelho-irregular: #FF4B4B;
         --fundo-card: #ffffff;
@@ -36,11 +37,11 @@ st.markdown("""
         .block-container { padding-top: 3.5rem !important; }
     }
     
-    /* ESTILO MINIMALISTA P/ BOTÕES DA BARRA LATERAL (BRANCO -> LARANJA) */
+    /* ESTILO MINIMALISTA P/ BOTÕES DA BARRA LATERAL (LARANJA ESCURO -> LARANJA) */
     section[data-testid="stSidebar"] div.stButton > button {
         background-color: transparent !important;
-        border: 1px solid #ffffff !important; /* Borda branca */
-        color: #ffffff !important; /* Texto branco */
+        border: 1px solid var(--laranja-escuro) !important; /* Borda laranja escuro */
+        color: var(--laranja-escuro) !important; /* Texto laranja escuro */
         border-radius: 4px !important;
         padding: 4px 8px !important;
         font-weight: 600;
@@ -58,8 +59,8 @@ st.markdown("""
     /* BOTÃO DE DOWNLOAD NA BARRA LATERAL */
     section[data-testid="stSidebar"] div[data-testid="stDownloadButton"] > button {
         background-color: transparent !important;
-        border: 1px solid #ffffff !important;
-        color: #ffffff !important;
+        border: 1px solid var(--laranja-escuro) !important;
+        color: var(--laranja-escuro) !important;
         border-radius: 4px !important;
         padding: 4px 8px !important;
         font-weight: bold;
@@ -90,9 +91,7 @@ st.markdown("""
     }
 
     .metric-box { background: linear-gradient(135deg, #003366 0%, #001a33 100%); border-left: 5px solid #00AEEF; padding: 20px; border-radius: 10px; color: white; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; height: 140px; display: flex; flex-direction: column; justify-content: center; }
-    /* .metric-box-irreg REMOVIDO PARA USAR O PADRÃO AZUL */
     .metric-title { font-size: 13px; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; color: #b3e6ff; letter-spacing: 0.5px; }
-    /* .metric-title-irreg REMOVIDO PARA USAR O PADRÃO AZUL */
     .metric-value { font-size: 40px; font-weight: 900; margin: 0; line-height: 1; color: #ffffff; }
     .status-card { padding: 25px; border-radius: 12px; color: white; text-align: center; font-size: 1.8rem; font-weight: bold; margin-bottom: 25px; box-shadow: 0 6px 12px rgba(0,0,0,0.15); text-transform: uppercase; letter-spacing: 1px; }
     .status-regular { background-color: var(--verde-regular); }
@@ -262,7 +261,6 @@ if not df.empty:
             
         st.markdown("---")
         
-        # BOTÕES MINIMALISTAS E SEM ÍCONES
         if st.button("ABRIR PAINEL DE INDICADORES", use_container_width=True):
             st.session_state.modo_exibicao = 'dashboard'
             st.session_state.input_busca = "" 
@@ -280,7 +278,6 @@ if not df.empty:
             filtro_contrato = st.selectbox("Contrato:", ["Todos", "Apenas Regulares", "Apenas Irregulares"])
             filtro_operacao = st.selectbox("Situação:", ["Todas", "Em Operação", "Inativos/Desativados"])
             
-            # BOTÃO MINIMALISTA E SEM ÍCONE
             if st.button("PROCESSAR E GERAR PDF", use_container_width=True):
                 df_pdf = df.copy()
                 if wbs_relatorio.strip() != "":
@@ -338,7 +335,6 @@ if not df.empty:
     # ==========================================================
     elif st.session_state.modo_exibicao == 'irregulares_wbs':
         st.markdown("<h2 style='color: #FF4B4B;'>🚨 Monitor de Pontos Irregulares por Estrutura (WBS)</h2>", unsafe_allow_html=True)
-        # CORREÇÃO: Texto preto para aparecer no fundo branco
         st.markdown('<p style="color: black;">Abaixo estão listadas todas as estruturas que possuem captações sem contrato. Clique no botão de download abaixo do quadro para gerar o relatório específico da WBS.</p>', unsafe_allow_html=True)
         st.markdown("---")
         
@@ -357,7 +353,6 @@ if not df.empty:
                 if wbs_label == "": wbs_label = "NÃO INFORMADA"
                 
                 with cols[i % 4]:
-                    # CORREÇÃO: Usando a classe padrão azul (metric-box) e título padrão (metric-title)
                     st.markdown(f"""
                         <div class="metric-box">
                             <div class="metric-title">WBS: {wbs_label}</div>
