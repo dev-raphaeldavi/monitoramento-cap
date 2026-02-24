@@ -35,8 +35,64 @@ st.markdown("""
         .subtitulo { font-size: 18px !important; text-align: center; margin-bottom: 20px !important; }
         .block-container { padding-top: 3.5rem !important; }
     }
+    
+    /* ESTILO MINIMALISTA P/ BOTÕES DA BARRA LATERAL (BRANCO -> LARANJA) */
+    section[data-testid="stSidebar"] div.stButton > button {
+        background-color: transparent !important;
+        border: 1px solid #ffffff !important; /* Borda branca */
+        color: #ffffff !important; /* Texto branco */
+        border-radius: 4px !important;
+        padding: 4px 8px !important;
+        font-weight: 600;
+        font-size: 13px !important;
+        box-shadow: none !important;
+        min-height: 32px !important;
+        transition: 0.2s;
+    }
+    section[data-testid="stSidebar"] div.stButton > button:hover {
+        border-color: var(--laranja) !important;
+        color: var(--laranja) !important;
+        background-color: rgba(247, 148, 30, 0.1) !important;
+    }
+
+    /* BOTÃO DE DOWNLOAD NA BARRA LATERAL */
+    section[data-testid="stSidebar"] div[data-testid="stDownloadButton"] > button {
+        background-color: transparent !important;
+        border: 1px solid #ffffff !important;
+        color: #ffffff !important;
+        border-radius: 4px !important;
+        padding: 4px 8px !important;
+        font-weight: bold;
+        font-size: 13px !important;
+        transition: 0.2s;
+    }
+    section[data-testid="stSidebar"] div[data-testid="stDownloadButton"] > button:hover {
+        border-color: var(--laranja) !important;
+        background-color: var(--laranja) !important;
+        color: #ffffff !important;
+    }
+
+    /* BOTÕES DE DOWNLOAD NA TELA PRINCIPAL (QUADRINHOS) - PRETO -> LARANJA */
+    div.block-container div[data-testid="stDownloadButton"] > button {
+        background-color: transparent !important;
+        border: 1px solid #000000 !important; /* Borda Preta */
+        color: #000000 !important; /* Texto Preto */
+        border-radius: 4px !important;
+        padding: 4px 8px !important;
+        font-weight: bold;
+        font-size: 13px !important;
+        transition: 0.2s;
+    }
+    div.block-container div[data-testid="stDownloadButton"] > button:hover {
+        background-color: var(--laranja) !important;
+        border-color: var(--laranja) !important;
+        color: #ffffff !important;
+    }
+
     .metric-box { background: linear-gradient(135deg, #003366 0%, #001a33 100%); border-left: 5px solid #00AEEF; padding: 20px; border-radius: 10px; color: white; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; height: 140px; display: flex; flex-direction: column; justify-content: center; }
+    /* .metric-box-irreg REMOVIDO PARA USAR O PADRÃO AZUL */
     .metric-title { font-size: 13px; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; color: #b3e6ff; letter-spacing: 0.5px; }
+    /* .metric-title-irreg REMOVIDO PARA USAR O PADRÃO AZUL */
     .metric-value { font-size: 40px; font-weight: 900; margin: 0; line-height: 1; color: #ffffff; }
     .status-card { padding: 25px; border-radius: 12px; color: white; text-align: center; font-size: 1.8rem; font-weight: bold; margin-bottom: 25px; box-shadow: 0 6px 12px rgba(0,0,0,0.15); text-transform: uppercase; letter-spacing: 1px; }
     .status-regular { background-color: var(--verde-regular); }
@@ -95,7 +151,7 @@ def extrator_seguro(dataframe, nomes_possiveis):
             return coluna.fillna('').astype(str).str.upper()
     return pd.Series([''] * len(dataframe), index=dataframe.index)
 
-# 5. GERADOR DE PDF CUSTOMIZADO E DINÂMICO
+# 5. GERADOR DE PDF CUSTOMIZADO
 class PDFRelatorio(FPDF):
     def footer(self):
         self.set_y(-15)
@@ -104,6 +160,10 @@ class PDFRelatorio(FPDF):
         self.cell(w=0, h=10, txt=f'Gerado em: {data_atual}   |   Página {self.page_no()}', align='C')
 
 def gerar_pdf(df_filtrado, wbs_nome, subtitulo):
+    df_filtrado = df_filtrado.copy()
+    df_filtrado['TEMP_ESTACA'] = extrator_seguro(df_filtrado, ['ESTACA'])
+    df_filtrado = df_filtrado.sort_values(by='TEMP_ESTACA')
+
     pdf = PDFRelatorio(orientation='L')
     pdf.add_page()
     
@@ -124,7 +184,7 @@ def gerar_pdf(df_filtrado, wbs_nome, subtitulo):
     pdf.cell(w=0, h=10, txt=limpar_texto(titulo), ln=1, align='C')
     pdf.set_font("Helvetica", 'B', 10)
     pdf.set_text_color(100, 100, 100)
-    pdf.cell(w=0, h=6, txt=limpar_texto(f"Filtros aplicados: {subtitulo}"), ln=1, align='C')
+    pdf.cell(w=0, h=6, txt=limpar_texto(f"Filtros: {subtitulo}"), ln=1, align='C')
     pdf.set_font("Helvetica", 'B', 12)
     pdf.set_text_color(0, 0, 0)
     pdf.cell(w=0, h=8, txt=limpar_texto(f"Total de pontos encontrados: {len(df_filtrado)}"), ln=1, align='C')
@@ -192,7 +252,7 @@ if not df.empty:
 
     # 7. BARRA LATERAL (MENU E GERADOR DE RELATÓRIOS)
     with st.sidebar:
-        st.markdown(f"<h2 style='color: #ffa500; margin-bottom:5px;'>🔍 Buscar Captação</h2>", unsafe_allow_html=True)
+        st.markdown(f"<h2 style='color: #ffa500; margin-bottom:5px; font-size: 18px;'>BUSCAR CAPTAÇÃO</h2>", unsafe_allow_html=True)
         tipo_busca = st.radio("Método de busca:", ["Por ID", "Por Proprietário", "Por Estrutura (WBS)"], label_visibility="collapsed")
         
         busca = st.text_input("Digite aqui e tecle ENTER:")
@@ -202,43 +262,39 @@ if not df.empty:
             
         st.markdown("---")
         
-        if st.button("📊 ABRIR PAINEL DE INDICADORES", use_container_width=True):
+        # BOTÕES MINIMALISTAS E SEM ÍCONES
+        if st.button("ABRIR PAINEL DE INDICADORES", use_container_width=True):
             st.session_state.modo_exibicao = 'dashboard'
+            st.session_state.input_busca = "" 
+            
+        if st.button("PONTOS IRREGULARES POR ESTRUTURA", use_container_width=True):
+            st.session_state.modo_exibicao = 'irregulares_wbs'
             st.session_state.input_busca = "" 
         
         st.markdown("---")
         
-        # ==========================================================
-        # NOVO GERADOR DE RELATÓRIOS AVANÇADO (VERSÃO 1.0 B)
-        # ==========================================================
-        st.markdown(f"<h2 style='color: #ffa500; margin-bottom:5px;'>📄 Central de Relatórios</h2>", unsafe_allow_html=True)
+        st.markdown(f"<h2 style='color: #ffa500; margin-bottom:5px; font-size: 18px;'>CENTRAL DE RELATÓRIOS</h2>", unsafe_allow_html=True)
         
-        with st.expander("🛠️ Abrir Filtros de Relatório", expanded=True):
-            wbs_relatorio = st.text_input("Estrutura (WBS) - Opcional:", placeholder="Deixe em branco para GERAL")
+        with st.expander("Abrir Filtros de Relatório", expanded=False):
+            wbs_relatorio = st.text_input("Estrutura (WBS) - Opcional:", placeholder="Deixe branco p/ GERAL")
             filtro_contrato = st.selectbox("Contrato:", ["Todos", "Apenas Regulares", "Apenas Irregulares"])
             filtro_operacao = st.selectbox("Situação:", ["Todas", "Em Operação", "Inativos/Desativados"])
             
-            if st.button("⚙️ Processar e Gerar PDF", use_container_width=True):
-                # 1. Filtro de WBS
+            # BOTÃO MINIMALISTA E SEM ÍCONE
+            if st.button("PROCESSAR E GERAR PDF", use_container_width=True):
                 df_pdf = df.copy()
                 if wbs_relatorio.strip() != "":
                     col_wbs = extrator_seguro(df_pdf, ['ESTRUTURA (WBS)', 'ESTRUTURA'])
                     df_pdf = df_pdf[col_wbs.str.contains(wbs_relatorio.strip(), case=False, na=False)]
                 
-                # 2. Filtro de Contrato
                 if filtro_contrato == "Apenas Regulares": df_pdf = df_pdf[df_pdf['IS_REGULAR'] == True]
                 elif filtro_contrato == "Apenas Irregulares": df_pdf = df_pdf[df_pdf['IS_REGULAR'] == False]
                 
-                # 3. Filtro Operacional
                 sit_pdf = extrator_seguro(df_pdf, ['SITUAÇÃO', 'SITUACAO'])
                 if filtro_operacao == "Em Operação":
                     df_pdf = df_pdf[sit_pdf.str.contains('OPERA', na=False)]
                 elif filtro_operacao == "Inativos/Desativados":
                     df_pdf = df_pdf[sit_pdf.str.contains('DESATI|NÃO INST|NAO INST', na=False)]
-                
-                # 4. ORDENAÇÃO CRESCENTE POR ESTACA (Regra de Ouro Versão 1.0 B)
-                df_pdf['TEMP_ESTACA'] = extrator_seguro(df_pdf, ['ESTACA'])
-                df_pdf = df_pdf.sort_values(by='TEMP_ESTACA')
                 
                 if df_pdf.empty:
                     st.error("Nenhum ponto encontrado com esses filtros.")
@@ -248,7 +304,7 @@ if not df.empty:
                     pdf_bytes = gerar_pdf(df_pdf, wbs_relatorio.strip(), subtitulo)
                     
                     st.download_button(
-                        label=f"📥 BAIXAR PDF AGORA",
+                        label=f"BAIXAR PDF AGORA",
                         data=pdf_bytes,
                         file_name=f"Relatorio_{'WBS_'+wbs_relatorio.strip() if wbs_relatorio.strip() else 'GERAL'}.pdf",
                         mime="application/pdf",
@@ -256,10 +312,10 @@ if not df.empty:
                     )
         
         st.caption(f"<div style='margin-top:20px'>Base Total: **{len(df)} registros**</div>", unsafe_allow_html=True)
-        st.markdown('<div class="assinatura-app">App por Raphael Davi - Versão 1.0 B</div>', unsafe_allow_html=True)
+        st.markdown('<div class="assinatura-app">App por Raphael Davi - Versão 1.0 C</div>', unsafe_allow_html=True)
 
     # ==========================================================
-    # TELA 1: DASHBOARD
+    # TELA 1: DASHBOARD DE INDICADORES GERAIS
     # ==========================================================
     if st.session_state.modo_exibicao == 'dashboard':
         st.markdown("<h2 style='color: #00AEEF;'>Painel Geral de Indicadores</h2>", unsafe_allow_html=True)
@@ -278,7 +334,52 @@ if not df.empty:
         with colI: st.markdown(card_metrica("TOTAL DE PONTOS EIXO LESTE", len(df[mask_leste])), unsafe_allow_html=True)
 
     # ==========================================================
-    # TELA 2: MODO BUSCA TRADICIONAL COM NOVOS CAMPOS
+    # TELA 2: TELA DE IRREGULARES POR WBS COM QUADRINHOS
+    # ==========================================================
+    elif st.session_state.modo_exibicao == 'irregulares_wbs':
+        st.markdown("<h2 style='color: #FF4B4B;'>🚨 Monitor de Pontos Irregulares por Estrutura (WBS)</h2>", unsafe_allow_html=True)
+        # CORREÇÃO: Texto preto para aparecer no fundo branco
+        st.markdown('<p style="color: black;">Abaixo estão listadas todas as estruturas que possuem captações sem contrato. Clique no botão de download abaixo do quadro para gerar o relatório específico da WBS.</p>', unsafe_allow_html=True)
+        st.markdown("---")
+        
+        df_irregulares = df[mask_irreg].copy()
+        col_wbs_irreg = extrator_seguro(df_irregulares, ['ESTRUTURA (WBS)', 'ESTRUTURA'])
+        df_irregulares['WBS_CLEAN'] = col_wbs_irreg
+        
+        contagem_wbs = df_irregulares['WBS_CLEAN'].value_counts()
+        
+        if contagem_wbs.empty:
+            st.success("🎉 Excelente! Não há nenhum ponto irregular cadastrado na base de dados no momento.")
+        else:
+            cols = st.columns(4)
+            for i, (wbs_nome, qtde) in enumerate(contagem_wbs.items()):
+                wbs_label = str(wbs_nome).strip()
+                if wbs_label == "": wbs_label = "NÃO INFORMADA"
+                
+                with cols[i % 4]:
+                    # CORREÇÃO: Usando a classe padrão azul (metric-box) e título padrão (metric-title)
+                    st.markdown(f"""
+                        <div class="metric-box">
+                            <div class="metric-title">WBS: {wbs_label}</div>
+                            <div class="metric-value" style="font-size: 28px;">{qtde} Pontos</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    df_wbs_especifica = df_irregulares[df_irregulares['WBS_CLEAN'] == wbs_nome]
+                    pdf_bytes_wbs = gerar_pdf(df_wbs_especifica, wbs_label, "Apenas Irregulares | Ordem: Estaca")
+                    
+                    st.download_button(
+                        label=f"BAIXAR PDF ({wbs_label})",
+                        data=pdf_bytes_wbs,
+                        file_name=f"Irregulares_WBS_{wbs_label}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                        key=f"dl_wbs_{i}"
+                    )
+                    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ==========================================================
+    # TELA 3: MODO BUSCA TRADICIONAL
     # ==========================================================
     elif st.session_state.modo_exibicao == 'busca' and st.session_state.input_busca.strip() != "":
         termo = st.session_state.input_busca.strip()
@@ -326,7 +427,6 @@ if not df.empty:
                 if pd.isna(valor) or str(valor).strip().upper() in ['NAN', 'NONE', '']: valor = "Não informado"
                 return f'<div class="info-card"><div class="info-label">{label}</div><div class="info-value">{valor}</div></div>'
 
-            # NOVO LAYOUT DE EXIBIÇÃO: 3 COLUNAS + 1 CARD GIGANTE PARA OBSERVAÇÕES
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.markdown(criar_card("Proprietário", ponto.get('PROPRIETÁRIO')), unsafe_allow_html=True)
@@ -342,10 +442,8 @@ if not df.empty:
                 st.markdown(criar_card("Município", ponto.get('MUNICÍPIO')), unsafe_allow_html=True)
                 st.markdown(criar_card("Sistema", ponto.get('SISTEMA')), unsafe_allow_html=True)
                 st.markdown(criar_card("Placa Instalada?", ponto.get('PLACA INSTALADA')), unsafe_allow_html=True)
-                # COLUNA NOVA
                 st.markdown(criar_card("Material Comprado", ponto.get('MATERIAL COMPRADO')), unsafe_allow_html=True)
 
-            # CARD LARGÃO PARA A OBSERVAÇÃO
             st.markdown(criar_card("Observação CPISF", ponto.get('OBSERVAÇÃO CPISF', ponto.get('OBSERVACAO CPISF'))), unsafe_allow_html=True)
 
 else:
