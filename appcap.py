@@ -284,8 +284,8 @@ if not df.empty:
                     col_wbs = extrator_seguro(df_pdf, ['ESTRUTURA (WBS)', 'ESTRUTURA'])
                     df_pdf = df_pdf[col_wbs.str.contains(wbs_relatorio.strip(), case=False, na=False)]
                 
-                if filtro_contrato == "Apenas Regulares": df_pdf = df_pdf[df_pdf['IS_REGULAR'] == True]
-                elif filtro_contrato == "Apenas Irregulares": df_pdf = df_pdf[df_pdf['IS_REGULAR'] == False]
+                if filtro_contrato == "Com Contrato": df_pdf = df_pdf[df_pdf['IS_REGULAR'] == True]
+                elif filtro_contrato == "Sem Contrato": df_pdf = df_pdf[df_pdf['IS_REGULAR'] == False]
                 
                 sit_pdf = extrator_seguro(df_pdf, ['SITUAÇÃO', 'SITUACAO'])
                 if filtro_operacao == "Em Operação":
@@ -318,15 +318,15 @@ if not df.empty:
         st.markdown("<h2 style='color: #00AEEF;'>Painel Geral de Indicadores</h2>", unsafe_allow_html=True)
         def card_metrica(titulo, valor): return f'<div class="metric-box"><div class="metric-title">{titulo}</div><div class="metric-value">{valor}</div></div>'
         colA, colB, colC = st.columns(3)
-        with colA: st.markdown(card_metrica("QUANTIDADE DE PONTOS", len(df)), unsafe_allow_html=True)
+        with colA: st.markdown(card_metrica("QUANTIDADE DE PONTOS - GERAL", len(df)), unsafe_allow_html=True)
         with colB: st.markdown(card_metrica("TOTAL COM CONTRATO", len(df[mask_reg])), unsafe_allow_html=True)
         with colC: st.markdown(card_metrica("TOTAL SEM CONTRATO", len(df[mask_irreg])), unsafe_allow_html=True)
         colD, colE, colF = st.columns(3)
         with colD: st.markdown(card_metrica("TOTAL COM CONTRATO (OPERANDO)", len(df[mask_reg & mask_operando])), unsafe_allow_html=True)
-        with colE: st.markdown(card_metrica("TOTAL COM CONTRATO (DESATIVADO)", len(df[mask_reg & mask_inativas])), unsafe_allow_html=True)
+        with colE: st.markdown(card_metrica("TOTAL COM CONTRATO (NÃO INSTALADO)", len(df[mask_reg & mask_inativas])), unsafe_allow_html=True)
         with colF: st.markdown(card_metrica("TOTAL SEM CONTRATO (OPERANDO)", len(df[mask_irreg & mask_operando])), unsafe_allow_html=True)
         colG, colH, colI = st.columns(3)
-        with colG: st.markdown(card_metrica("TOTAL SEM CONTRATO (NÃO INSTALADO)", len(df[mask_irreg & mask_inativas])), unsafe_allow_html=True)
+        with colG: st.markdown(card_metrica("TOTAL SEM CONTRATO (DESATIVADO)", len(df[mask_irreg & mask_inativas])), unsafe_allow_html=True)
         with colH: st.markdown(card_metrica("TOTAL DE PONTOS RAMAL DO AGRESTE", len(df[mask_agreste])), unsafe_allow_html=True)
         with colI: st.markdown(card_metrica("TOTAL DE PONTOS EIXO LESTE", len(df[mask_leste])), unsafe_allow_html=True)
 
