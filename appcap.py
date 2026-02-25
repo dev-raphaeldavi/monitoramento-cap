@@ -335,7 +335,7 @@ if not df.empty:
     # ==========================================================
     elif st.session_state.modo_exibicao == 'irregulares_wbs':
         st.markdown("<h2 style='color: #FF4B4B;'>🚨 Monitor de Pontos Irregulares por Estrutura (WBS)</h2>", unsafe_allow_html=True)
-        st.markdown('<p style="color: black;">Abaixo estão listadas todas as estruturas que possuem captações sem contrato. Clique no botão de download abaixo do quadro para gerar o relatório específico da WBS.</p>', unsafe_allow_html=True)
+        st.markdown('<p style="color: black;">Abaixo estão listadas todas as estruturas que possuem captações sem contrato e estão operando. Clique no botão de download abaixo do quadro para gerar o relatório específico da WBS.</p>', unsafe_allow_html=True)
         st.markdown("---")
         
         df_irregulares = df[mask_irreg].copy()
