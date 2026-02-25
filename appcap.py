@@ -275,7 +275,7 @@ if not df.empty:
         
         with st.expander("Abrir Filtros de Relatório", expanded=False):
             wbs_relatorio = st.text_input("Estrutura (WBS) - Opcional:", placeholder="Deixe branco p/ GERAL")
-            filtro_contrato = st.selectbox("Contrato:", ["Todos", "Apenas Regulares", "Apenas Irregulares"])
+            filtro_contrato = st.selectbox("Contrato:", ["Todos", "Com Contrato", "Sem Contrato"])
             filtro_operacao = st.selectbox("Situação:", ["Todas", "Em Operação", "Inativos/Desativados"])
             
             if st.button("PROCESSAR E GERAR PDF", use_container_width=True):
@@ -361,7 +361,7 @@ if not df.empty:
                     """, unsafe_allow_html=True)
                     
                     df_wbs_especifica = df_irregulares[df_irregulares['WBS_CLEAN'] == wbs_nome]
-                    pdf_bytes_wbs = gerar_pdf(df_wbs_especifica, wbs_label, "Apenas Irregulares | Ordem: Estaca")
+                    pdf_bytes_wbs = gerar_pdf(df_wbs_especifica, wbs_label, "Sem Contrato | Ordem: Estaca")
                     
                     st.download_button(
                         label=f"BAIXAR PDF ({wbs_label})",
