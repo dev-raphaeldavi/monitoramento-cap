@@ -3,7 +3,7 @@ import pandas as pd
 from fpdf import FPDF
 import tempfile
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 # 1. CONFIGURAÇÃO DA PÁGINA E CONTROLE DE ESTADOS
 st.set_page_config(page_title="Monitor de Captações PISF", page_icon="💧", layout="wide", initial_sidebar_state="expanded")
@@ -149,12 +149,16 @@ def extrator_seguro(dataframe, nomes_possiveis):
             return coluna.fillna('').astype(str).str.upper()
     return pd.Series([''] * len(dataframe), index=dataframe.index)
 
-# 5. GERADOR DE PDF CUSTOMIZADO (AGORA COM A COLUNA WBS)
+# 5. GERADOR DE PDF CUSTOMIZADO (COM COR DINÂMICA E FUSO CORRETO)
 class PDFRelatorio(FPDF):
     def footer(self):
         self.set_y(-15)
         self.set_font('Helvetica', 'I', 8) 
-        data_atual = datetime.now().strftime("%d/%m/%Y às %H:%M")
+        
+        # 🚨 CORREÇÃO DO FUSO HORÁRIO PARA RECIFE/PE (GMT-3)
+        fuso_br = timezone(timedelta(hours=-3))
+        data_atual = datetime.now(fuso_br).strftime("%d/%m/%Y às %H:%M")
+        
         self.cell(w=0, h=10, txt=f'Gerado em: {data_atual}   |   Página {self.page_no()}', align='C')
 
 def gerar_pdf(df_filtrado, wbs_nome, subtitulo):
@@ -179,20 +183,23 @@ def gerar_pdf(df_filtrado, wbs_nome, subtitulo):
     titulo = f"Relatório de Captações - WBS: {wbs_nome}" if wbs_nome else "Relatório Geral de Captações (Toda a Obra)"
     
     pdf.set_font("Helvetica", 'B', 16)
+    pdf.set_text_color(0, 0, 0)
     pdf.cell(w=0, h=10, txt=limpar_texto(titulo), ln=1, align='C')
+    
     pdf.set_font("Helvetica", 'B', 10)
     pdf.set_text_color(100, 100, 100)
     pdf.cell(w=0, h=6, txt=limpar_texto(f"Filtros: {subtitulo}"), ln=1, align='C')
+    
     pdf.set_font("Helvetica", 'B', 12)
     pdf.set_text_color(0, 0, 0)
     pdf.cell(w=0, h=8, txt=limpar_texto(f"Total de pontos encontrados: {len(df_filtrado)}"), ln=1, align='C')
     pdf.ln(3)
     
-    pdf.set_font("Helvetica", 'B', 8) # Fonte levemente menor para caber WBS
+    # CABEÇALHO DA TABELA
+    pdf.set_font("Helvetica", 'B', 8) 
     pdf.set_fill_color(0, 51, 102) 
     pdf.set_text_color(255, 255, 255)
     
-    # 🚨 NOVO LAYOUT DE LARGURAS PARA INCLUIR A WBS
     pdf.cell(w=12, h=8, txt="ID", border=1, fill=True, align='C')
     pdf.cell(w=60, h=8, txt="NOME DO PROPRIETARIO", border=1, fill=True, align='C')
     pdf.cell(w=35, h=8, txt="WBS", border=1, fill=True, align='C')
@@ -204,15 +211,22 @@ def gerar_pdf(df_filtrado, wbs_nome, subtitulo):
     pdf.ln()
 
     pdf.set_font("Helvetica", '', 7.5)
-    pdf.set_text_color(0, 0, 0)
     
+    # DADOS DA TABELA (COM CORES DINÂMICAS)
     for _, row in df_filtrado.iterrows():
+        
+        # 🚨 SE FOR IRREGULAR (SEM CONTRATO) = VERMELHO. SE FOR REGULAR = PRETO.
+        if row.get('IS_REGULAR') == False:
+            pdf.set_text_color(220, 0, 0) # Vermelho forte e legível
+        else:
+            pdf.set_text_color(0, 0, 0) # Preto normal
+            
         coord = f"{limpar_texto(row.get('LAT'))} / {limpar_texto(row.get('LONG'))}"
         wbs_atual = limpar_texto(row.get('ESTRUTURA (WBS)', row.get('ESTRUTURA', '')))[:20]
         
         pdf.cell(w=12, h=8, txt=limpar_texto(row.get('ID')), border=1, align='C')
         pdf.cell(w=60, h=8, txt=limpar_texto(row.get('PROPRIETÁRIO'))[:35], border=1)
-        pdf.cell(w=35, h=8, txt=wbs_atual, border=1, align='C') # Nova Coluna WBS
+        pdf.cell(w=35, h=8, txt=wbs_atual, border=1, align='C') 
         pdf.cell(w=18, h=8, txt=limpar_texto(row.get('ESTACA')), border=1, align='C')
         pdf.cell(w=45, h=8, txt=coord, border=1, align='C')
         pdf.cell(w=15, h=8, txt=limpar_texto(row.get('ZONA')), border=1, align='C')
