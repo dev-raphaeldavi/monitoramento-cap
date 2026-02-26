@@ -149,14 +149,14 @@ def extrator_seguro(dataframe, nomes_possiveis):
             return coluna.fillna('').astype(str).str.upper()
     return pd.Series([''] * len(dataframe), index=dataframe.index)
 
-# 5. GERADOR DE PDF CUSTOMIZADO (TEXTO VERMELHO E HORA MATEMÁTICA)
+# 5. GERADOR DE PDF CUSTOMIZADO (VER G COM COLUNAS AJUSTADAS)
 class PDFRelatorio(FPDF):
     def footer(self):
         self.set_y(-15)
         self.set_font('Helvetica', 'I', 8) 
-        self.set_text_color(100, 100, 100) # Garante que o rodapé seja sempre cinza
+        self.set_text_color(100, 100, 100) # Garante que o rodapé seja cinza
         
-        # 🚨 FORÇA BRUTA NO FUSO HORÁRIO: Pega a hora Universal e subtrai 3 horas (Recife/PE)
+        # Fuso Horário de Recife (UTC -3) sem usar biblioteca timezone
         hora_recife = datetime.utcnow() - timedelta(hours=3)
         data_atual = hora_recife.strftime("%d/%m/%Y às %H:%M")
         
@@ -200,38 +200,42 @@ def gerar_pdf(df_filtrado, wbs_nome, subtitulo):
     pdf.set_fill_color(0, 51, 102) 
     pdf.set_text_color(255, 255, 255)
     
+    # NOVAS LARGURAS PARA CABER TUDO (Total de 277)
     pdf.cell(w=12, h=8, txt="ID", border=1, fill=True, align='C')
-    pdf.cell(w=60, h=8, txt="NOME DO PROPRIETARIO", border=1, fill=True, align='C')
-    pdf.cell(w=35, h=8, txt="WBS", border=1, fill=True, align='C')
-    pdf.cell(w=18, h=8, txt="ESTACA", border=1, fill=True, align='C')
-    pdf.cell(w=45, h=8, txt="COORDENADAS", border=1, fill=True, align='C')
-    pdf.cell(w=15, h=8, txt="ZONA", border=1, fill=True, align='C')
-    pdf.cell(w=15, h=8, txt="LADO", border=1, fill=True, align='C')
-    pdf.cell(w=75, h=8, txt="SITUACAO", border=1, fill=True, align='C')
+    pdf.cell(w=62, h=8, txt="NOME DO PROPRIETARIO", border=1, fill=True, align='C')
+    pdf.cell(w=25, h=8, txt="WBS", border=1, fill=True, align='C')
+    pdf.cell(w=50, h=8, txt="ESTACA", border=1, fill=True, align='C')
+    pdf.cell(w=35, h=8, txt="COORDENADAS", border=1, fill=True, align='C')
+    pdf.cell(w=12, h=8, txt="ZONA", border=1, fill=True, align='C')
+    pdf.cell(w=14, h=8, txt="LADO", border=1, fill=True, align='C')
+    pdf.cell(w=67, h=8, txt="SITUACAO", border=1, fill=True, align='C')
     pdf.ln()
 
     pdf.set_font("Helvetica", '', 7.5)
     
-    # 🚨 LAÇO DE REPETIÇÃO COM A COR VERMELHA OBRIGATÓRIA
     for _, row in df_filtrado.iterrows():
         
-        # Se for Irregular (Falso para Contrato Regular), escreve em VERMELHO
-        if row['IS_REGULAR'] == False:
-            pdf.set_text_color(255, 0, 0) # Vermelho Puro
+        # Cor Vermelha para irregulares, Preto para regulares
+        if row.get('IS_REGULAR') == False:
+            pdf.set_text_color(255, 0, 0)
         else:
-            pdf.set_text_color(0, 0, 0) # Preto Normal
+            pdf.set_text_color(0, 0, 0)
             
         coord = f"{limpar_texto(row.get('LAT'))} / {limpar_texto(row.get('LONG'))}"
-        wbs_atual = limpar_texto(row.get('ESTRUTURA (WBS)', row.get('ESTRUTURA', '')))[:20]
+        wbs_atual = limpar_texto(row.get('ESTRUTURA (WBS)', row.get('ESTRUTURA', '')))
+        estaca_atual = limpar_texto(row.get('ESTACA'))
+        nome_prop = limpar_texto(row.get('PROPRIETÁRIO'))
+        situacao = limpar_texto(row.get('SITUAÇÃO'))
         
-        pdf.cell(w=12, h=8, txt=limpar_texto(row.get('ID')), border=1, align='C')
-        pdf.cell(w=60, h=8, txt=limpar_texto(row.get('PROPRIETÁRIO'))[:35], border=1)
-        pdf.cell(w=35, h=8, txt=wbs_atual, border=1, align='C')
-        pdf.cell(w=18, h=8, txt=limpar_texto(row.get('ESTACA')), border=1, align='C')
-        pdf.cell(w=45, h=8, txt=coord, border=1, align='C')
-        pdf.cell(w=15, h=8, txt=limpar_texto(row.get('ZONA')), border=1, align='C')
-        pdf.cell(w=15, h=8, txt=limpar_texto(row.get('LADO')), border=1, align='C')
-        pdf.cell(w=75, h=8, txt=limpar_texto(row.get('SITUAÇÃO'))[:45], border=1, align='C')
+        # Cortando os textos para garantir que nunca invadam a próxima coluna
+        pdf.cell(w=12, h=8, txt=limpar_texto(row.get('ID'))[:6], border=1, align='C')
+        pdf.cell(w=62, h=8, txt=nome_prop[:38], border=1)
+        pdf.cell(w=25, h=8, txt=wbs_atual[:15], border=1, align='C')
+        pdf.cell(w=50, h=8, txt=estaca_atual[:30], border=1, align='C')
+        pdf.cell(w=35, h=8, txt=coord[:22], border=1, align='C')
+        pdf.cell(w=12, h=8, txt=limpar_texto(row.get('ZONA'))[:5], border=1, align='C')
+        pdf.cell(w=14, h=8, txt=limpar_texto(row.get('LADO'))[:5], border=1, align='C')
+        pdf.cell(w=67, h=8, txt=situacao[:40], border=1, align='C')
         pdf.ln()
     
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
@@ -343,121 +347,4 @@ if not df.empty:
         with colD: st.markdown(card_metrica("TOTAL COM CONTRATO (OPERANDO)", len(df[mask_reg & mask_operando])), unsafe_allow_html=True)
         with colE: st.markdown(card_metrica("TOTAL COM CONTRATO (DESATIVADO)", len(df[mask_reg & mask_inativas])), unsafe_allow_html=True)
         with colF: st.markdown(card_metrica("TOTAL SEM CONTRATO (OPERANDO)", len(df[mask_irreg & mask_operando])), unsafe_allow_html=True)
-        colG, colH, colI = st.columns(3)
-        with colG: st.markdown(card_metrica("TOTAL SEM CONTRATO (NÃO INSTALADO)", len(df[mask_irreg & mask_inativas])), unsafe_allow_html=True)
-        with colH: st.markdown(card_metrica("TOTAL DE PONTOS RAMAL DO AGRESTE", len(df[mask_agreste])), unsafe_allow_html=True)
-        with colI: st.markdown(card_metrica("TOTAL DE PONTOS EIXO LESTE", len(df[mask_leste])), unsafe_allow_html=True)
-
-    # ==========================================================
-    # TELA 2: TELA DE IRREGULARES POR WBS COM QUADRINHOS
-    # ==========================================================
-    elif st.session_state.modo_exibicao == 'irregulares_wbs':
-        st.markdown("<h2 style='color: #FF4B4B;'>🚨 Monitor de Pontos Irregulares por Estrutura (WBS)</h2>", unsafe_allow_html=True)
-        st.markdown('<p style="color: black;">Abaixo estão listadas todas as estruturas que possuem captações sem contrato. Clique no botão de download abaixo do quadro para gerar o relatório específico da WBS.</p>', unsafe_allow_html=True)
-        st.markdown("---")
-        
-        df_irregulares = df[mask_irreg].copy()
-        col_wbs_irreg = extrator_seguro(df_irregulares, ['ESTRUTURA (WBS)', 'ESTRUTURA'])
-        df_irregulares['WBS_CLEAN'] = col_wbs_irreg
-        
-        contagem_wbs = df_irregulares['WBS_CLEAN'].value_counts()
-        
-        if contagem_wbs.empty:
-            st.success("🎉 Excelente! Não há nenhum ponto irregular cadastrado na base de dados no momento.")
-        else:
-            cols = st.columns(4)
-            for i, (wbs_nome, qtde) in enumerate(contagem_wbs.items()):
-                wbs_label = str(wbs_nome).strip()
-                if wbs_label == "": wbs_label = "NÃO INFORMADA"
-                
-                with cols[i % 4]:
-                    st.markdown(f"""
-                        <div class="metric-box">
-                            <div class="metric-title">WBS: {wbs_label}</div>
-                            <div class="metric-value" style="font-size: 28px;">{qtde} Pontos</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    
-                    df_wbs_especifica = df_irregulares[df_irregulares['WBS_CLEAN'] == wbs_nome]
-                    pdf_bytes_wbs = gerar_pdf(df_wbs_especifica, wbs_label, "Apenas Irregulares | Ordem: Estaca")
-                    
-                    st.download_button(
-                        label=f"BAIXAR PDF ({wbs_label})",
-                        data=pdf_bytes_wbs,
-                        file_name=f"Irregulares_WBS_{wbs_label}.pdf",
-                        mime="application/pdf",
-                        use_container_width=True,
-                        key=f"dl_wbs_{i}"
-                    )
-                    st.markdown("<br>", unsafe_allow_html=True)
-
-    # ==========================================================
-    # TELA 3: MODO BUSCA TRADICIONAL
-    # ==========================================================
-    elif st.session_state.modo_exibicao == 'busca' and st.session_state.input_busca.strip() != "":
-        termo = st.session_state.input_busca.strip()
-        
-        if tipo_busca == "Por ID": resultados = df[df['ID'].astype(str).str.strip() == termo]
-        elif tipo_busca == "Por Proprietário":
-            col_prop = extrator_seguro(df, ['PROPRIETÁRIO', 'PROPRIETARIO'])
-            resultados = df[col_prop.str.contains(termo, case=False, na=False)]
-        elif tipo_busca == "Por Estrutura (WBS)":
-            col_wbs = extrator_seguro(df, ['ESTRUTURA (WBS)', 'ESTRUTURA'])
-            resultados = df[col_wbs.str.contains(termo, case=False, na=False)]
-
-        if resultados.empty:
-            st.warning(f"⚠️ Nenhum registro encontrado para '{termo}'. Verifique a digitação.")
-        else:
-            if len(resultados) > 1:
-                if tipo_busca == "Por Estrutura (WBS)":
-                    qtd_com = len(resultados[resultados['IS_REGULAR'] == True])
-                    qtd_sem = len(resultados[resultados['IS_REGULAR'] == False])
-                    col_sit_res = extrator_seguro(resultados, ['SITUAÇÃO', 'SITUACAO'])
-                    qtd_op = len(resultados[col_sit_res.str.contains('OPERA', na=False)])
-                    st.info(f"🔍 Encontramos **{len(resultados)}** pontos correspondentes ({qtd_com} COM CONTRATO, {qtd_sem} SEM CONTRATO E {qtd_op} EM OPERAÇÃO). Selecione uma na lista abaixo:")
-                else:
-                    st.info(f"🔍 Encontramos **{len(resultados)}** pontos correspondentes. Selecione uma na lista abaixo:")
-                    
-                opcoes_lista = [(idx, f"ID: {row.get('ID', '-')} | Nome: {row.get('PROPRIETÁRIO', '-')} | WBS: {row.get('ESTRUTURA (WBS)', '-')}") for idx, row in resultados.iterrows()]
-                escolha = st.selectbox("Lista de Resultados:", opcoes_lista, format_func=lambda x: x[1])
-                ponto = resultados.loc[escolha[0]]
-            else:
-                ponto = resultados.iloc[0]
-                if tipo_busca != "Por ID": st.success("✅ Apenas 1 ponto encontrado! Mostrando detalhes abaixo.")
-
-            st.markdown("---")
-            is_regular = ponto['IS_REGULAR']
-            num_contrato = str(ponto.get('CONTRATO', '')).strip().upper()
-            termos_invalidos = ['NAN', 'NÃO ID.', 'NAO ID.', 'NÃO IDENTIFICADO', 'NENHUM', 'NONE', '']
-
-            if is_regular:
-                texto_contrato = num_contrato if num_contrato not in termos_invalidos else "Válido"
-                st.markdown(f'<div class="status-card status-regular">✅ REGULAR <br><span style="font-size: 1.2rem;">Contrato: {texto_contrato}</span></div>', unsafe_allow_html=True)
-            else:
-                st.markdown(f'<div class="status-card status-irregular">❌ IRREGULAR <br><span style="font-size: 1.2rem;">Situação: Sem Contrato Regularizado</span></div>', unsafe_allow_html=True)
-
-            def criar_card(label, valor):
-                if pd.isna(valor) or str(valor).strip().upper() in ['NAN', 'NONE', '']: valor = "Não informado"
-                return f'<div class="info-card"><div class="info-label">{label}</div><div class="info-value">{valor}</div></div>'
-
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.markdown(criar_card("Proprietário", ponto.get('PROPRIETÁRIO')), unsafe_allow_html=True)
-                st.markdown(criar_card("Situação Operacional", ponto.get('SITUAÇÃO')), unsafe_allow_html=True)
-                st.markdown(criar_card("Uso da Água", ponto.get('USO DA ÁGUA')), unsafe_allow_html=True)
-                st.markdown(criar_card("Vazão Estimada (m³/mês)", ponto.get('VAZÃO ESTIMADA (M3/MÊS)')), unsafe_allow_html=True)
-            with col2:
-                st.markdown(criar_card("Estrutura (WBS)", ponto.get('ESTRUTURA (WBS)')), unsafe_allow_html=True)
-                st.markdown(criar_card("Localização (Estaca)", ponto.get('ESTACA')), unsafe_allow_html=True)
-                st.markdown(criar_card("Eixo / Lado / Zona", f"{str(ponto.get('EIXO')).replace('nan', '-')} / {str(ponto.get('LADO')).replace('nan', '-')} / {str(ponto.get('ZONA')).replace('nan', '-')}"), unsafe_allow_html=True)
-                st.markdown(criar_card("Coordenadas", f"Lat: {ponto.get('LAT')} <br> Long: {ponto.get('LONG')}"), unsafe_allow_html=True)
-            with col3:
-                st.markdown(criar_card("Município", ponto.get('MUNICÍPIO')), unsafe_allow_html=True)
-                st.markdown(criar_card("Sistema", ponto.get('SISTEMA')), unsafe_allow_html=True)
-                st.markdown(criar_card("Placa Instalada?", ponto.get('PLACA INSTALADA')), unsafe_allow_html=True)
-                st.markdown(criar_card("Material Comprado", ponto.get('MATERIAL COMPRADO')), unsafe_allow_html=True)
-
-            st.markdown(criar_card("Observação CPISF", ponto.get('OBSERVAÇÃO CPISF', ponto.get('OBSERVACAO CPISF'))), unsafe_allow_html=True)
-
-else:
-    st.info("🔄 Carregando dados do servidor Google Drive...")
+        colG, colH, colI =
