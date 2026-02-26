@@ -122,7 +122,6 @@ def carregar_dados():
         df.columns = nomes_limpos
         df = df.iloc[linha_cabecalho + 1:].reset_index(drop=True)
 
-        # 🚨 EXTERMINADOR DE LINHAS FANTASMAS (Remove linhas vazias exportadas pelo Google Sheets)
         df = df[~df['ID'].astype(str).str.strip().str.upper().isin(['NAN', 'NONE', ''])]
 
         def classificar_regular(row):
@@ -150,7 +149,7 @@ def extrator_seguro(dataframe, nomes_possiveis):
             return coluna.fillna('').astype(str).str.upper()
     return pd.Series([''] * len(dataframe), index=dataframe.index)
 
-# 5. GERADOR DE PDF CUSTOMIZADO
+# 5. GERADOR DE PDF CUSTOMIZADO (AGORA COM A COLUNA WBS)
 class PDFRelatorio(FPDF):
     def footer(self):
         self.set_y(-15)
@@ -189,30 +188,35 @@ def gerar_pdf(df_filtrado, wbs_nome, subtitulo):
     pdf.cell(w=0, h=8, txt=limpar_texto(f"Total de pontos encontrados: {len(df_filtrado)}"), ln=1, align='C')
     pdf.ln(3)
     
-    pdf.set_font("Helvetica", 'B', 9)
+    pdf.set_font("Helvetica", 'B', 8) # Fonte levemente menor para caber WBS
     pdf.set_fill_color(0, 51, 102) 
     pdf.set_text_color(255, 255, 255)
     
-    pdf.cell(w=15, h=8, txt="ID", border=1, fill=True, align='C')
-    pdf.cell(w=75, h=8, txt="NOME DO PROPRIETARIO", border=1, fill=True, align='C')
-    pdf.cell(w=20, h=8, txt="ESTACA", border=1, fill=True, align='C')
-    pdf.cell(w=50, h=8, txt="COORDENADAS", border=1, fill=True, align='C')
-    pdf.cell(w=20, h=8, txt="ZONA", border=1, fill=True, align='C')
-    pdf.cell(w=20, h=8, txt="LADO", border=1, fill=True, align='C')
+    # 🚨 NOVO LAYOUT DE LARGURAS PARA INCLUIR A WBS
+    pdf.cell(w=12, h=8, txt="ID", border=1, fill=True, align='C')
+    pdf.cell(w=60, h=8, txt="NOME DO PROPRIETARIO", border=1, fill=True, align='C')
+    pdf.cell(w=35, h=8, txt="WBS", border=1, fill=True, align='C')
+    pdf.cell(w=18, h=8, txt="ESTACA", border=1, fill=True, align='C')
+    pdf.cell(w=45, h=8, txt="COORDENADAS", border=1, fill=True, align='C')
+    pdf.cell(w=15, h=8, txt="ZONA", border=1, fill=True, align='C')
+    pdf.cell(w=15, h=8, txt="LADO", border=1, fill=True, align='C')
     pdf.cell(w=75, h=8, txt="SITUACAO", border=1, fill=True, align='C')
     pdf.ln()
 
-    pdf.set_font("Helvetica", '', 8)
+    pdf.set_font("Helvetica", '', 7.5)
     pdf.set_text_color(0, 0, 0)
     
     for _, row in df_filtrado.iterrows():
         coord = f"{limpar_texto(row.get('LAT'))} / {limpar_texto(row.get('LONG'))}"
-        pdf.cell(w=15, h=8, txt=limpar_texto(row.get('ID')), border=1, align='C')
-        pdf.cell(w=75, h=8, txt=limpar_texto(row.get('PROPRIETÁRIO'))[:45], border=1)
-        pdf.cell(w=20, h=8, txt=limpar_texto(row.get('ESTACA')), border=1, align='C')
-        pdf.cell(w=50, h=8, txt=coord, border=1, align='C')
-        pdf.cell(w=20, h=8, txt=limpar_texto(row.get('ZONA')), border=1, align='C')
-        pdf.cell(w=20, h=8, txt=limpar_texto(row.get('LADO')), border=1, align='C')
+        wbs_atual = limpar_texto(row.get('ESTRUTURA (WBS)', row.get('ESTRUTURA', '')))[:20]
+        
+        pdf.cell(w=12, h=8, txt=limpar_texto(row.get('ID')), border=1, align='C')
+        pdf.cell(w=60, h=8, txt=limpar_texto(row.get('PROPRIETÁRIO'))[:35], border=1)
+        pdf.cell(w=35, h=8, txt=wbs_atual, border=1, align='C') # Nova Coluna WBS
+        pdf.cell(w=18, h=8, txt=limpar_texto(row.get('ESTACA')), border=1, align='C')
+        pdf.cell(w=45, h=8, txt=coord, border=1, align='C')
+        pdf.cell(w=15, h=8, txt=limpar_texto(row.get('ZONA')), border=1, align='C')
+        pdf.cell(w=15, h=8, txt=limpar_texto(row.get('LADO')), border=1, align='C')
         pdf.cell(w=75, h=8, txt=limpar_texto(row.get('SITUAÇÃO'))[:45], border=1, align='C')
         pdf.ln()
     
@@ -309,7 +313,7 @@ if not df.empty:
                     )
         
         st.caption(f"<div style='margin-top:20px'>Base Total: **{len(df)} registros**</div>", unsafe_allow_html=True)
-        st.markdown('<div class="assinatura-app">App por Raphael Davi - Versão 1.0 D</div>', unsafe_allow_html=True)
+        st.markdown('<div class="assinatura-app">App por Raphael Davi - Versão 1.0 C</div>', unsafe_allow_html=True)
 
     # ==========================================================
     # TELA 1: DASHBOARD DE INDICADORES GERAIS
