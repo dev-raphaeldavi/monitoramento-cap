@@ -18,7 +18,7 @@ st.markdown("""
         --azul-escuro: #003366;
         --azul-claro: #00AEEF;
         --laranja: #F7941E;
-        --laranja-escuro: #D46A00; /* Novo tom para aparecer no tema claro do celular */
+        --laranja-escuro: #D46A00; 
         --verde-regular: #28A745;
         --vermelho-irregular: #FF4B4B;
         --fundo-card: #ffffff;
@@ -37,11 +37,10 @@ st.markdown("""
         .block-container { padding-top: 3.5rem !important; }
     }
     
-    /* ESTILO MINIMALISTA P/ BOTÕES DA BARRA LATERAL (LARANJA ESCURO -> LARANJA) */
     section[data-testid="stSidebar"] div.stButton > button {
         background-color: transparent !important;
-        border: 1px solid var(--laranja-escuro) !important; /* Borda laranja escuro */
-        color: var(--laranja-escuro) !important; /* Texto laranja escuro */
+        border: 1px solid var(--laranja-escuro) !important;
+        color: var(--laranja-escuro) !important;
         border-radius: 4px !important;
         padding: 4px 8px !important;
         font-weight: 600;
@@ -56,7 +55,6 @@ st.markdown("""
         background-color: rgba(247, 148, 30, 0.1) !important;
     }
 
-    /* BOTÃO DE DOWNLOAD NA BARRA LATERAL */
     section[data-testid="stSidebar"] div[data-testid="stDownloadButton"] > button {
         background-color: transparent !important;
         border: 1px solid var(--laranja-escuro) !important;
@@ -73,11 +71,10 @@ st.markdown("""
         color: #ffffff !important;
     }
 
-    /* BOTÕES DE DOWNLOAD NA TELA PRINCIPAL (QUADRINHOS) - PRETO -> LARANJA */
     div.block-container div[data-testid="stDownloadButton"] > button {
         background-color: transparent !important;
-        border: 1px solid #000000 !important; /* Borda Preta */
-        color: #000000 !important; /* Texto Preto */
+        border: 1px solid #000000 !important;
+        color: #000000 !important;
         border-radius: 4px !important;
         padding: 4px 8px !important;
         font-weight: bold;
@@ -124,6 +121,9 @@ def carregar_dados():
             
         df.columns = nomes_limpos
         df = df.iloc[linha_cabecalho + 1:].reset_index(drop=True)
+
+        # 🚨 EXTERMINADOR DE LINHAS FANTASMAS (Remove linhas vazias exportadas pelo Google Sheets)
+        df = df[~df['ID'].astype(str).str.strip().str.upper().isin(['NAN', 'NONE', ''])]
 
         def classificar_regular(row):
             c_assinado = str(row.get('CONTRATO ASSINADO', '')).strip().upper()
@@ -275,7 +275,7 @@ if not df.empty:
         
         with st.expander("Abrir Filtros de Relatório", expanded=False):
             wbs_relatorio = st.text_input("Estrutura (WBS) - Opcional:", placeholder="Deixe branco p/ GERAL")
-            filtro_contrato = st.selectbox("Contrato:", ["Todos", "Com Contrato", "Sem Contrato"])
+            filtro_contrato = st.selectbox("Contrato:", ["Todos", "Apenas Regulares", "Apenas Irregulares"])
             filtro_operacao = st.selectbox("Situação:", ["Todas", "Em Operação", "Inativos/Desativados"])
             
             if st.button("PROCESSAR E GERAR PDF", use_container_width=True):
@@ -284,8 +284,8 @@ if not df.empty:
                     col_wbs = extrator_seguro(df_pdf, ['ESTRUTURA (WBS)', 'ESTRUTURA'])
                     df_pdf = df_pdf[col_wbs.str.contains(wbs_relatorio.strip(), case=False, na=False)]
                 
-                if filtro_contrato == "Com Contrato": df_pdf = df_pdf[df_pdf['IS_REGULAR'] == True]
-                elif filtro_contrato == "Sem Contrato": df_pdf = df_pdf[df_pdf['IS_REGULAR'] == False]
+                if filtro_contrato == "Apenas Regulares": df_pdf = df_pdf[df_pdf['IS_REGULAR'] == True]
+                elif filtro_contrato == "Apenas Irregulares": df_pdf = df_pdf[df_pdf['IS_REGULAR'] == False]
                 
                 sit_pdf = extrator_seguro(df_pdf, ['SITUAÇÃO', 'SITUACAO'])
                 if filtro_operacao == "Em Operação":
@@ -318,15 +318,15 @@ if not df.empty:
         st.markdown("<h2 style='color: #00AEEF;'>Painel Geral de Indicadores</h2>", unsafe_allow_html=True)
         def card_metrica(titulo, valor): return f'<div class="metric-box"><div class="metric-title">{titulo}</div><div class="metric-value">{valor}</div></div>'
         colA, colB, colC = st.columns(3)
-        with colA: st.markdown(card_metrica("QUANTIDADE DE PONTOS - GERAL", len(df)), unsafe_allow_html=True)
+        with colA: st.markdown(card_metrica("QUANTIDADE DE PONTOS", len(df)), unsafe_allow_html=True)
         with colB: st.markdown(card_metrica("TOTAL COM CONTRATO", len(df[mask_reg])), unsafe_allow_html=True)
         with colC: st.markdown(card_metrica("TOTAL SEM CONTRATO", len(df[mask_irreg])), unsafe_allow_html=True)
         colD, colE, colF = st.columns(3)
         with colD: st.markdown(card_metrica("TOTAL COM CONTRATO (OPERANDO)", len(df[mask_reg & mask_operando])), unsafe_allow_html=True)
-        with colE: st.markdown(card_metrica("TOTAL COM CONTRATO (NÃO INSTALADO)", len(df[mask_reg & mask_inativas])), unsafe_allow_html=True)
+        with colE: st.markdown(card_metrica("TOTAL COM CONTRATO (DESATIVADO)", len(df[mask_reg & mask_inativas])), unsafe_allow_html=True)
         with colF: st.markdown(card_metrica("TOTAL SEM CONTRATO (OPERANDO)", len(df[mask_irreg & mask_operando])), unsafe_allow_html=True)
         colG, colH, colI = st.columns(3)
-        with colG: st.markdown(card_metrica("TOTAL SEM CONTRATO (DESATIVADO)", len(df[mask_irreg & mask_inativas])), unsafe_allow_html=True)
+        with colG: st.markdown(card_metrica("TOTAL SEM CONTRATO (NÃO INSTALADO)", len(df[mask_irreg & mask_inativas])), unsafe_allow_html=True)
         with colH: st.markdown(card_metrica("TOTAL DE PONTOS RAMAL DO AGRESTE", len(df[mask_agreste])), unsafe_allow_html=True)
         with colI: st.markdown(card_metrica("TOTAL DE PONTOS EIXO LESTE", len(df[mask_leste])), unsafe_allow_html=True)
 
@@ -361,7 +361,7 @@ if not df.empty:
                     """, unsafe_allow_html=True)
                     
                     df_wbs_especifica = df_irregulares[df_irregulares['WBS_CLEAN'] == wbs_nome]
-                    pdf_bytes_wbs = gerar_pdf(df_wbs_especifica, wbs_label, "Sem Contrato | Ordem: Estaca")
+                    pdf_bytes_wbs = gerar_pdf(df_wbs_especifica, wbs_label, "Apenas Irregulares | Ordem: Estaca")
                     
                     st.download_button(
                         label=f"BAIXAR PDF ({wbs_label})",
@@ -388,59 +388,4 @@ if not df.empty:
             resultados = df[col_wbs.str.contains(termo, case=False, na=False)]
 
         if resultados.empty:
-            st.warning(f"⚠️ Nenhum registro encontrado para '{termo}'. Verifique a digitação.")
-        else:
-            if len(resultados) > 1:
-                if tipo_busca == "Por Estrutura (WBS)":
-                    qtd_com = len(resultados[resultados['IS_REGULAR'] == True])
-                    qtd_sem = len(resultados[resultados['IS_REGULAR'] == False])
-                    col_sit_res = extrator_seguro(resultados, ['SITUAÇÃO', 'SITUACAO'])
-                    qtd_op = len(resultados[col_sit_res.str.contains('OPERA', na=False)])
-                    st.info(f"🔍 Encontramos **{len(resultados)}** pontos correspondentes ({qtd_com} COM CONTRATO, {qtd_sem} SEM CONTRATO E {qtd_op} EM OPERAÇÃO). Selecione uma na lista abaixo:")
-                else:
-                    st.info(f"🔍 Encontramos **{len(resultados)}** pontos correspondentes. Selecione uma na lista abaixo:")
-                    
-                opcoes_lista = [(idx, f"ID: {row.get('ID', '-')} | Nome: {row.get('PROPRIETÁRIO', '-')} | WBS: {row.get('ESTRUTURA (WBS)', '-')}") for idx, row in resultados.iterrows()]
-                escolha = st.selectbox("Lista de Resultados:", opcoes_lista, format_func=lambda x: x[1])
-                ponto = resultados.loc[escolha[0]]
-            else:
-                ponto = resultados.iloc[0]
-                if tipo_busca != "Por ID": st.success("✅ Apenas 1 ponto encontrado! Mostrando detalhes abaixo.")
-
-            st.markdown("---")
-            is_regular = ponto['IS_REGULAR']
-            num_contrato = str(ponto.get('CONTRATO', '')).strip().upper()
-            termos_invalidos = ['NAN', 'NÃO ID.', 'NAO ID.', 'NÃO IDENTIFICADO', 'NENHUM', 'NONE', '']
-
-            if is_regular:
-                texto_contrato = num_contrato if num_contrato not in termos_invalidos else "Válido"
-                st.markdown(f'<div class="status-card status-regular">✅ REGULAR <br><span style="font-size: 1.2rem;">Contrato: {texto_contrato}</span></div>', unsafe_allow_html=True)
-            else:
-                st.markdown(f'<div class="status-card status-irregular">❌ IRREGULAR <br><span style="font-size: 1.2rem;">Situação: Sem Contrato Regularizado</span></div>', unsafe_allow_html=True)
-
-            def criar_card(label, valor):
-                if pd.isna(valor) or str(valor).strip().upper() in ['NAN', 'NONE', '']: valor = "Não informado"
-                return f'<div class="info-card"><div class="info-label">{label}</div><div class="info-value">{valor}</div></div>'
-
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.markdown(criar_card("Proprietário", ponto.get('PROPRIETÁRIO')), unsafe_allow_html=True)
-                st.markdown(criar_card("Situação Operacional", ponto.get('SITUAÇÃO')), unsafe_allow_html=True)
-                st.markdown(criar_card("Uso da Água", ponto.get('USO DA ÁGUA')), unsafe_allow_html=True)
-                st.markdown(criar_card("Vazão Estimada (m³/mês)", ponto.get('VAZÃO ESTIMADA (M3/MÊS)')), unsafe_allow_html=True)
-            with col2:
-                st.markdown(criar_card("Estrutura (WBS)", ponto.get('ESTRUTURA (WBS)')), unsafe_allow_html=True)
-                st.markdown(criar_card("Localização (Estaca)", ponto.get('ESTACA')), unsafe_allow_html=True)
-                st.markdown(criar_card("Eixo / Lado / Zona", f"{str(ponto.get('EIXO')).replace('nan', '-')} / {str(ponto.get('LADO')).replace('nan', '-')} / {str(ponto.get('ZONA')).replace('nan', '-')}"), unsafe_allow_html=True)
-                st.markdown(criar_card("Coordenadas", f"Lat: {ponto.get('LAT')} <br> Long: {ponto.get('LONG')}"), unsafe_allow_html=True)
-            with col3:
-                st.markdown(criar_card("Município", ponto.get('MUNICÍPIO')), unsafe_allow_html=True)
-                st.markdown(criar_card("Sistema", ponto.get('SISTEMA')), unsafe_allow_html=True)
-                st.markdown(criar_card("Placa Instalada?", ponto.get('PLACA INSTALADA')), unsafe_allow_html=True)
-                st.markdown(criar_card("Material Comprado", ponto.get('MATERIAL COMPRADO')), unsafe_allow_html=True)
-
-            st.markdown(criar_card("Observação CPISF", ponto.get('OBSERVAÇÃO CPISF', ponto.get('OBSERVACAO CPISF'))), unsafe_allow_html=True)
-
-else:
-    st.info("🔄 Carregando dados do servidor Google Drive...")
-
+            st.warning(f"⚠️ Nenhum registro encontrado para '{termo
