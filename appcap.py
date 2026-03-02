@@ -123,6 +123,8 @@ def carregar_dados():
         df = df.iloc[linha_cabecalho + 1:].reset_index(drop=True)
 
         df = df[~df['ID'].astype(str).str.strip().str.upper().isin(['NAN', 'NONE', ''])]
+        df = df[df['ID'].notna()]
+        df = df[df['ID'].astype(str).str.strip() != ""]
 
         def classificar_regular(row):
             c_assinado = str(row.get('CONTRATO ASSINADO', '')).strip().upper()
@@ -149,17 +151,14 @@ def extrator_seguro(dataframe, nomes_possiveis):
             return coluna.fillna('').astype(str).str.upper()
     return pd.Series([''] * len(dataframe), index=dataframe.index)
 
-# 5. GERADOR DE PDF CUSTOMIZADO (VER G COM COLUNAS AJUSTADAS)
+# 5. GERADOR DE PDF CUSTOMIZADO
 class PDFRelatorio(FPDF):
     def footer(self):
         self.set_y(-15)
         self.set_font('Helvetica', 'I', 8) 
-        self.set_text_color(100, 100, 100) # Garante que o rodapé seja cinza
-        
-        # Fuso Horário de Recife (UTC -3) sem usar biblioteca timezone
+        self.set_text_color(100, 100, 100)
         hora_recife = datetime.utcnow() - timedelta(hours=3)
         data_atual = hora_recife.strftime("%d/%m/%Y às %H:%M")
-        
         self.cell(w=0, h=10, txt=f'Gerado em: {data_atual}   |   Página {self.page_no()}', align='C')
 
 def gerar_pdf(df_filtrado, wbs_nome, subtitulo):
@@ -200,22 +199,21 @@ def gerar_pdf(df_filtrado, wbs_nome, subtitulo):
     pdf.set_fill_color(0, 51, 102) 
     pdf.set_text_color(255, 255, 255)
     
-    # NOVAS LARGURAS PARA CABER TUDO (Total de 277)
+    # LARGURAS (Total de 277)
     pdf.cell(w=12, h=8, txt="ID", border=1, fill=True, align='C')
-    pdf.cell(w=62, h=8, txt="NOME DO PROPRIETARIO", border=1, fill=True, align='C')
-    pdf.cell(w=25, h=8, txt="WBS", border=1, fill=True, align='C')
-    pdf.cell(w=50, h=8, txt="ESTACA", border=1, fill=True, align='C')
-    pdf.cell(w=35, h=8, txt="COORDENADAS", border=1, fill=True, align='C')
-    pdf.cell(w=12, h=8, txt="ZONA", border=1, fill=True, align='C')
-    pdf.cell(w=14, h=8, txt="LADO", border=1, fill=True, align='C')
-    pdf.cell(w=67, h=8, txt="SITUACAO", border=1, fill=True, align='C')
+    pdf.cell(w=50, h=8, txt="NOME DO PROPRIETARIO", border=1, fill=True, align='C')
+    pdf.cell(w=35, h=8, txt="CONTRATO", border=1, fill=True, align='C')
+    pdf.cell(w=22, h=8, txt="WBS", border=1, fill=True, align='C')
+    pdf.cell(w=40, h=8, txt="ESTACA", border=1, fill=True, align='C')
+    pdf.cell(w=30, h=8, txt="COORDENADAS", border=1, fill=True, align='C')
+    pdf.cell(w=10, h=8, txt="ZONA", border=1, fill=True, align='C')
+    pdf.cell(w=10, h=8, txt="LADO", border=1, fill=True, align='C')
+    pdf.cell(w=68, h=8, txt="SITUACAO", border=1, fill=True, align='C')
     pdf.ln()
 
-    pdf.set_font("Helvetica", '', 7.5)
+    pdf.set_font("Helvetica", '', 7)
     
     for _, row in df_filtrado.iterrows():
-        
-        # Cor Vermelha para irregulares, Preto para regulares
         if row.get('IS_REGULAR') == False:
             pdf.set_text_color(255, 0, 0)
         else:
@@ -225,17 +223,18 @@ def gerar_pdf(df_filtrado, wbs_nome, subtitulo):
         wbs_atual = limpar_texto(row.get('ESTRUTURA (WBS)', row.get('ESTRUTURA', '')))
         estaca_atual = limpar_texto(row.get('ESTACA'))
         nome_prop = limpar_texto(row.get('PROPRIETÁRIO'))
+        contrato_atual = limpar_texto(row.get('CONTRATO'))
         situacao = limpar_texto(row.get('SITUAÇÃO'))
         
-        # Cortando os textos para garantir que nunca invadam a próxima coluna
         pdf.cell(w=12, h=8, txt=limpar_texto(row.get('ID'))[:6], border=1, align='C')
-        pdf.cell(w=62, h=8, txt=nome_prop[:38], border=1)
-        pdf.cell(w=25, h=8, txt=wbs_atual[:15], border=1, align='C')
-        pdf.cell(w=50, h=8, txt=estaca_atual[:30], border=1, align='C')
-        pdf.cell(w=35, h=8, txt=coord[:22], border=1, align='C')
-        pdf.cell(w=12, h=8, txt=limpar_texto(row.get('ZONA'))[:5], border=1, align='C')
-        pdf.cell(w=14, h=8, txt=limpar_texto(row.get('LADO'))[:5], border=1, align='C')
-        pdf.cell(w=67, h=8, txt=situacao[:40], border=1, align='C')
+        pdf.cell(w=50, h=8, txt=nome_prop[:28], border=1)
+        pdf.cell(w=35, h=8, txt=contrato_atual[:20], border=1, align='C')
+        pdf.cell(w=22, h=8, txt=wbs_atual[:12], border=1, align='C')
+        pdf.cell(w=40, h=8, txt=estaca_atual[:25], border=1, align='C')
+        pdf.cell(w=30, h=8, txt=coord[:18], border=1, align='C')
+        pdf.cell(w=10, h=8, txt=limpar_texto(row.get('ZONA'))[:4], border=1, align='C')
+        pdf.cell(w=10, h=8, txt=limpar_texto(row.get('LADO'))[:4], border=1, align='C')
+        pdf.cell(w=68, h=8, txt=situacao[:40], border=1, align='C')
         pdf.ln()
     
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
@@ -271,6 +270,10 @@ if not df.empty:
     mask_agreste = serie_locais.str.contains('AGRESTE', na=False)
     mask_leste = serie_locais.str.contains('LESTE', na=False)
 
+    serie_placa = extrator_seguro(df, ['PLACA INSTALADA', 'PLACA'])
+    mask_placa = serie_placa.str.contains('SIM|X|S', na=False)
+    mask_padronizadas = df.apply(lambda r: str(r.get('OBSERVAÇÃO CPISF', r.get('OBSERVACAO CPISF', ''))).strip() == "Captação padronizada instalada.", axis=1)
+
     # 7. BARRA LATERAL (MENU E GERADOR DE RELATÓRIOS)
     with st.sidebar:
         st.markdown(f"<h2 style='color: #ffa500; margin-bottom:5px; font-size: 18px;'>BUSCAR CAPTAÇÃO</h2>", unsafe_allow_html=True)
@@ -286,9 +289,17 @@ if not df.empty:
         if st.button("ABRIR PAINEL DE INDICADORES", use_container_width=True):
             st.session_state.modo_exibicao = 'dashboard'
             st.session_state.input_busca = "" 
-            
+
         if st.button("PONTOS IRREGULARES POR ESTRUTURA", use_container_width=True):
             st.session_state.modo_exibicao = 'irregulares_wbs'
+            st.session_state.input_busca = "" 
+            
+        if st.button("PONTOS COM PLACA INSTALADA", use_container_width=True):
+            st.session_state.modo_exibicao = 'placas'
+            st.session_state.input_busca = "" 
+            
+        if st.button("PONTOS COM INSTALAÇÃO PADRONIZADA", use_container_width=True):
+            st.session_state.modo_exibicao = 'padronizadas'
             st.session_state.input_busca = "" 
         
         st.markdown("---")
@@ -298,7 +309,7 @@ if not df.empty:
         with st.expander("Abrir Filtros de Relatório", expanded=False):
             wbs_relatorio = st.text_input("Estrutura (WBS) - Opcional:", placeholder="Deixe branco p/ GERAL")
             filtro_contrato = st.selectbox("Contrato:", ["Todos", "Apenas Regulares", "Apenas Irregulares"])
-            filtro_operacao = st.selectbox("Situação:", ["Todas", "Em Operação", "Inativos/Desativados"])
+            filtro_operacao = st.selectbox("Situação:", ["Todas", "Em Operação", "Não Instalados/Desativados"])
             
             if st.button("PROCESSAR E GERAR PDF", use_container_width=True):
                 df_pdf = df.copy()
@@ -312,7 +323,7 @@ if not df.empty:
                 sit_pdf = extrator_seguro(df_pdf, ['SITUAÇÃO', 'SITUACAO'])
                 if filtro_operacao == "Em Operação":
                     df_pdf = df_pdf[sit_pdf.str.contains('OPERA', na=False)]
-                elif filtro_operacao == "Inativos/s":
+                elif filtro_operacao == "Não Instalados/Desativados":
                     df_pdf = df_pdf[sit_pdf.str.contains('DESATI|NÃO INST|NAO INST', na=False)]
                 
                 if df_pdf.empty:
@@ -331,7 +342,7 @@ if not df.empty:
                     )
         
         st.caption(f"<div style='margin-top:20px'>Base Total: **{len(df)} registros**</div>", unsafe_allow_html=True)
-        st.markdown('<div class="assinatura-app">App por Raphael Davi - Versão 1.0 D</div>', unsafe_allow_html=True)
+        st.markdown('<div class="assinatura-app">App por Raphael Davi - Versão 1.0 E</div>', unsafe_allow_html=True)
 
     # ==========================================================
     # TELA 1: DASHBOARD DE INDICADORES GERAIS
@@ -340,17 +351,24 @@ if not df.empty:
         st.markdown("<h2 style='color: #00AEEF;'>Painel Geral de Indicadores</h2>", unsafe_allow_html=True)
         def card_metrica(titulo, valor): return f'<div class="metric-box"><div class="metric-title">{titulo}</div><div class="metric-value">{valor}</div></div>'
         colA, colB, colC = st.columns(3)
-        with colA: st.markdown(card_metrica("QUANTIDADE DE PONTOS", len(df)), unsafe_allow_html=True)
+        with colA: st.markdown(card_metrica("QUANTIDADE DE PONTOS - GERAL", len(df)), unsafe_allow_html=True)
         with colB: st.markdown(card_metrica("TOTAL COM CONTRATO", len(df[mask_reg])), unsafe_allow_html=True)
         with colC: st.markdown(card_metrica("TOTAL SEM CONTRATO", len(df[mask_irreg])), unsafe_allow_html=True)
+        
         colD, colE, colF = st.columns(3)
         with colD: st.markdown(card_metrica("TOTAL COM CONTRATO (OPERANDO)", len(df[mask_reg & mask_operando])), unsafe_allow_html=True)
         with colE: st.markdown(card_metrica("TOTAL COM CONTRATO (NÃO INSTALADO)", len(df[mask_reg & mask_inativas])), unsafe_allow_html=True)
         with colF: st.markdown(card_metrica("TOTAL SEM CONTRATO (OPERANDO)", len(df[mask_irreg & mask_operando])), unsafe_allow_html=True)
+        
         colG, colH, colI = st.columns(3)
         with colG: st.markdown(card_metrica("TOTAL SEM CONTRATO (DESATIVADO)", len(df[mask_irreg & mask_inativas])), unsafe_allow_html=True)
         with colH: st.markdown(card_metrica("TOTAL DE PONTOS RAMAL DO AGRESTE", len(df[mask_agreste])), unsafe_allow_html=True)
         with colI: st.markdown(card_metrica("TOTAL DE PONTOS EIXO LESTE", len(df[mask_leste])), unsafe_allow_html=True)
+
+        colJ, colK, colL = st.columns(3)
+        with colJ: st.markdown(card_metrica("CAPTAÇÕES COM PLACA INSTALADA", len(df[mask_placa])), unsafe_allow_html=True)
+        with colK: st.markdown(card_metrica("CAPTAÇÕES PADRONIZADAS", len(df[mask_padronizadas])), unsafe_allow_html=True)
+        with colL: st.empty()
 
     # ==========================================================
     # TELA 2: TELA DE IRREGULARES POR WBS COM QUADRINHOS
@@ -392,6 +410,92 @@ if not df.empty:
                         mime="application/pdf",
                         use_container_width=True,
                         key=f"dl_wbs_{i}"
+                    )
+                    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ==========================================================
+    # TELA BOTOES ADICIONAIS: PLACAS (EM QUADRINHOS)
+    # ==========================================================
+    elif st.session_state.modo_exibicao == 'placas':
+        st.markdown("<h2 style='color: #00AEEF;'>📋 Monitor de Pontos com Placa Instalada por Estrutura (WBS)</h2>", unsafe_allow_html=True)
+        st.markdown('<p style="color: black;">Abaixo estão listadas todas as estruturas que possuem captações com placa instalada. Clique no botão de download abaixo do quadro para gerar o relatório específico da WBS.</p>', unsafe_allow_html=True)
+        st.markdown("---")
+        
+        df_placas = df[mask_placa].copy()
+        col_wbs_placas = extrator_seguro(df_placas, ['ESTRUTURA (WBS)', 'ESTRUTURA'])
+        df_placas['WBS_CLEAN'] = col_wbs_placas
+        
+        contagem_wbs = df_placas['WBS_CLEAN'].value_counts()
+        
+        if contagem_wbs.empty:
+            st.info("Nenhum ponto com placa instalada encontrado.")
+        else:
+            cols = st.columns(4)
+            for i, (wbs_nome, qtde) in enumerate(contagem_wbs.items()):
+                wbs_label = str(wbs_nome).strip()
+                if wbs_label == "": wbs_label = "NÃO INFORMADA"
+                
+                with cols[i % 4]:
+                    st.markdown(f"""
+                        <div class="metric-box">
+                            <div class="metric-title">WBS: {wbs_label}</div>
+                            <div class="metric-value" style="font-size: 28px;">{qtde} Pontos</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    df_wbs_especifica = df_placas[df_placas['WBS_CLEAN'] == wbs_nome]
+                    pdf_bytes_wbs = gerar_pdf(df_wbs_especifica, wbs_label, "Com Placa Instalada | Ordem: Estaca")
+                    
+                    st.download_button(
+                        label=f"BAIXAR PDF ({wbs_label})",
+                        data=pdf_bytes_wbs,
+                        file_name=f"Placas_WBS_{wbs_label}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                        key=f"dl_placa_wbs_{i}"
+                    )
+                    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ==========================================================
+    # TELA BOTOES ADICIONAIS: PADRONIZADAS (EM QUADRINHOS)
+    # ==========================================================
+    elif st.session_state.modo_exibicao == 'padronizadas':
+        st.markdown("<h2 style='color: #28A745;'>🛠️ Monitor de Captações Padronizadas por Estrutura (WBS)</h2>", unsafe_allow_html=True)
+        st.markdown('<p style="color: black;">Abaixo estão listadas todas as estruturas que possuem captações com instalação padronizada. Clique no botão de download abaixo do quadro para gerar o relatório específico da WBS.</p>', unsafe_allow_html=True)
+        st.markdown("---")
+        
+        df_padrao = df[mask_padronizadas].copy()
+        col_wbs_padrao = extrator_seguro(df_padrao, ['ESTRUTURA (WBS)', 'ESTRUTURA'])
+        df_padrao['WBS_CLEAN'] = col_wbs_padrao
+        
+        contagem_wbs = df_padrao['WBS_CLEAN'].value_counts()
+        
+        if contagem_wbs.empty:
+            st.info("Nenhuma captação padronizada encontrada.")
+        else:
+            cols = st.columns(4)
+            for i, (wbs_nome, qtde) in enumerate(contagem_wbs.items()):
+                wbs_label = str(wbs_nome).strip()
+                if wbs_label == "": wbs_label = "NÃO INFORMADA"
+                
+                with cols[i % 4]:
+                    st.markdown(f"""
+                        <div class="metric-box">
+                            <div class="metric-title">WBS: {wbs_label}</div>
+                            <div class="metric-value" style="font-size: 28px;">{qtde} Pontos</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    df_wbs_especifica = df_padrao[df_padrao['WBS_CLEAN'] == wbs_nome]
+                    pdf_bytes_wbs = gerar_pdf(df_wbs_especifica, wbs_label, "Captações Padronizadas | Ordem: Estaca")
+                    
+                    st.download_button(
+                        label=f"BAIXAR PDF ({wbs_label})",
+                        data=pdf_bytes_wbs,
+                        file_name=f"Padronizadas_WBS_{wbs_label}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                        key=f"dl_padrao_wbs_{i}"
                     )
                     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -465,4 +569,3 @@ if not df.empty:
 
 else:
     st.info("🔄 Carregando dados do servidor Google Drive...")
-
