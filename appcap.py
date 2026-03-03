@@ -11,6 +11,12 @@ st.set_page_config(page_title="Monitor de Captações PISF", page_icon="💧", l
 if 'modo_exibicao' not in st.session_state: st.session_state.modo_exibicao = 'home' 
 if 'eixo_selecionado' not in st.session_state: st.session_state.eixo_selecionado = None 
 if 'input_busca' not in st.session_state: st.session_state.input_busca = ""
+if 'widget_busca' not in st.session_state: st.session_state.widget_busca = "" # Controlador do texto no campo
+
+# Função mágica que zera a pesquisa ANTES do sistema carregar a nova página
+def limpar_pesquisa():
+    st.session_state.widget_busca = ""
+    st.session_state.input_busca = ""
 
 # 2. IDENTIDADE VISUAL E CSS CUSTOMIZADO BLINDADO
 st.markdown("""
@@ -326,40 +332,37 @@ if not df.empty:
     # 7. BARRA LATERAL (MENU E GERADOR DE RELATÓRIOS)
     with st.sidebar:
         
-        if st.button("🏠 PONTOS PISF (EIXOS)", use_container_width=True):
+        # O on_click=limpar_pesquisa garante que o campo de texto será zerado ANTES de qualquer processamento
+        if st.button("🏠 PONTOS PISF (EIXOS)", use_container_width=True, on_click=limpar_pesquisa):
             st.session_state.modo_exibicao = 'home'
             st.session_state.eixo_selecionado = None
-            st.session_state.input_busca = ""
             
         st.markdown("---")
         
         st.markdown(f"<h2 style='color: #ffa500; margin-bottom:5px; font-size: 18px;'>BUSCAR CAPTAÇÃO</h2>", unsafe_allow_html=True)
         tipo_busca = st.radio("Método de busca:", ["Por ID", "Por Proprietário", "Por Estrutura (WBS)"], label_visibility="collapsed")
         
-        busca = st.text_input("Digite aqui e tecle ENTER:")
+        # Adicionado o key="widget_busca" para permitir a limpeza programada do campo
+        busca = st.text_input("Digite aqui e tecle ENTER:", key="widget_busca")
         if busca.strip() != "":
-            st.session_state.input_busca = busca
+            st.session_state.input_busca = busca.strip()
             st.session_state.modo_exibicao = 'busca'
             st.session_state.eixo_selecionado = None
             
         st.markdown("---")
         
-        if st.button("ABRIR PAINEL DE INDICADORES (GERAL)", use_container_width=True):
+        if st.button("ABRIR PAINEL DE INDICADORES (GERAL)", use_container_width=True, on_click=limpar_pesquisa):
             st.session_state.modo_exibicao = 'dashboard'
             st.session_state.eixo_selecionado = None
-            st.session_state.input_busca = "" 
 
-        if st.button("PONTOS IRREGULARES POR ESTRUTURA", use_container_width=True):
+        if st.button("PONTOS IRREGULARES POR ESTRUTURA", use_container_width=True, on_click=limpar_pesquisa):
             st.session_state.modo_exibicao = 'irregulares_wbs'
-            st.session_state.input_busca = "" 
             
-        if st.button("PONTOS COM PLACA INSTALADA", use_container_width=True):
+        if st.button("PONTOS COM PLACA INSTALADA", use_container_width=True, on_click=limpar_pesquisa):
             st.session_state.modo_exibicao = 'placas'
-            st.session_state.input_busca = "" 
             
-        if st.button("PONTOS COM INSTALAÇÃO PADRONIZADA", use_container_width=True):
+        if st.button("PONTOS COM INSTALAÇÃO PADRONIZADA", use_container_width=True, on_click=limpar_pesquisa):
             st.session_state.modo_exibicao = 'padronizadas'
-            st.session_state.input_busca = "" 
         
         st.markdown("---")
         
@@ -417,28 +420,24 @@ if not df.empty:
     # TELA 0: HOME (SELEÇÃO DE EIXOS COM BOTOES IDÊNTICOS AOS CARDS)
     # ==========================================================
     if st.session_state.modo_exibicao == 'home':
-        st.markdown("<h2 style='text-align: center; color: #003366; margin-bottom: 40px;'>Selecione o Eixo para visualizar os indicadores:</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center; color: #003366; margin-bottom: 40px;'>Selecione a região para visualizar os indicadores:</h2>", unsafe_allow_html=True)
         
         col1, col2, col3 = st.columns(3)
         
-        # Uso do type="primary" exato para acionar o nosso CSS blindado sem sumir o botão.
         with col1:
-            if st.button("EIXO NORTE", type="primary", use_container_width=True):
+            if st.button("EIXO NORTE", type="primary", use_container_width=True, on_click=limpar_pesquisa):
                 st.session_state.eixo_selecionado = 'Norte'
                 st.session_state.modo_exibicao = 'dashboard_eixo'
-                st.rerun()
                 
         with col2:
-            if st.button("EIXO LESTE", type="primary", use_container_width=True):
+            if st.button("EIXO LESTE", type="primary", use_container_width=True, on_click=limpar_pesquisa):
                 st.session_state.eixo_selecionado = 'Leste'
                 st.session_state.modo_exibicao = 'dashboard_eixo'
-                st.rerun()
                 
         with col3:
-            if st.button("RAMAL DO AGRESTE", type="primary", use_container_width=True):
+            if st.button("RAMAL DO AGRESTE", type="primary", use_container_width=True, on_click=limpar_pesquisa):
                 st.session_state.eixo_selecionado = 'Ramal do Agreste'
                 st.session_state.modo_exibicao = 'dashboard_eixo'
-                st.rerun()
 
     # ==========================================================
     # TELA 1.1: DASHBOARD ESPECÍFICO DE UM EIXO
