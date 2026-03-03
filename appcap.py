@@ -420,7 +420,7 @@ if not df.empty:
     # TELA 0: HOME (SELEÇÃO DE EIXOS COM BOTOES IDÊNTICOS AOS CARDS)
     # ==========================================================
     if st.session_state.modo_exibicao == 'home':
-        st.markdown("<h2 style='text-align: center; color: #003366; margin-bottom: 40px;'>Selecione a região para visualizar os indicadores:</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center; color: #003366; margin-bottom: 40px;'>Selecione o EIXO para visualizar os indicadores:</h2>", unsafe_allow_html=True)
         
         col1, col2, col3 = st.columns(3)
         
@@ -721,3 +721,4 @@ if not df.empty:
 
 else:
     st.info("🔄 Carregando dados do servidor Google Drive...")
+
