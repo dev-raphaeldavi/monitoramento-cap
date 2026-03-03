@@ -8,10 +8,11 @@ from datetime import datetime, timedelta
 # 1. CONFIGURAÇÃO DA PÁGINA E CONTROLE DE ESTADOS
 st.set_page_config(page_title="Monitor de Captações PISF", page_icon="💧", layout="wide", initial_sidebar_state="expanded")
 
-if 'modo_exibicao' not in st.session_state: st.session_state.modo_exibicao = 'dashboard' 
+if 'modo_exibicao' not in st.session_state: st.session_state.modo_exibicao = 'home' 
+if 'eixo_selecionado' not in st.session_state: st.session_state.eixo_selecionado = None 
 if 'input_busca' not in st.session_state: st.session_state.input_busca = ""
 
-# 2. IDENTIDADE VISUAL E CSS CUSTOMIZADO
+# 2. IDENTIDADE VISUAL E CSS CUSTOMIZADO BLINDADO
 st.markdown("""
     <style>
     :root {
@@ -31,13 +32,59 @@ st.markdown("""
     [data-testid="collapsedControl"] { background-color: rgba(0,0,0,0.05) !important; border-radius: 5px; }
     .titulo-principal { color: var(--azul-escuro); font-size: 60px !important; font-weight: 900; margin-top: 0px !important; margin-bottom: 0px !important; padding-bottom: 0px !important; line-height: 1.1; }
     .subtitulo { color: var(--azul-claro); font-size: 30px !important; font-weight: 600; margin-top: 0px !important; margin-bottom: 10px !important; }
+    
     @media (max-width: 768px) {
         .titulo-principal { font-size: 32px !important; text-align: center; }
         .subtitulo { font-size: 18px !important; text-align: center; margin-bottom: 20px !important; }
         .block-container { padding-top: 3.5rem !important; }
     }
     
-    section[data-testid="stSidebar"] div.stButton > button {
+    /* ==========================================================
+       CSS BLINDADO: BOTÕES DA HOME (IDÊNTICOS AOS QUADRINHOS)
+       ========================================================== */
+    button[kind="primary"] {
+        background: linear-gradient(135deg, #003366 0%, #001a33 100%) !important;
+        border: none !important;
+        border-left: 5px solid #00AEEF !important;
+        border-radius: 10px !important;
+        color: white !important;
+        height: 140px !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1) !important;
+        transition: all 0.2s ease !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }
+    button[kind="primary"] div[data-testid="stMarkdownContainer"] p {
+        font-size: 26px !important;
+        font-weight: 900 !important;
+        color: #ffffff !important;
+        text-transform: uppercase !important;
+        margin: 0 !important;
+    }
+    /* Hover leve: Clareia o azul e deixa a borda laranja, texto permanece branco */
+    button[kind="primary"]:hover {
+        transform: translateY(-3px) !important;
+        background: linear-gradient(135deg, #004488 0%, #002244 100%) !important; 
+        box-shadow: 0 8px 15px rgba(0,0,0,0.2) !important;
+        border-left: 5px solid var(--laranja) !important; 
+        color: white !important;
+    }
+    button[kind="primary"]:hover div[data-testid="stMarkdownContainer"] p {
+        color: white !important;
+    }
+    /* Clique: Fica escuro */
+    button[kind="primary"]:active, button[kind="primary"]:focus {
+        background: linear-gradient(135deg, #001a33 0%, #000000 100%) !important; 
+        border: none !important;
+        border-left: 5px solid #00AEEF !important;
+        box-shadow: inset 0 3px 5px rgba(0,0,0,0.5) !important;
+        color: white !important;
+    }
+
+    /* Estilos Gerais (Barra Lateral e outros botões) */
+    section[data-testid="stSidebar"] div.stButton > button[kind="secondary"] {
         background-color: transparent !important;
         border: 1px solid var(--laranja-escuro) !important;
         color: var(--laranja-escuro) !important;
@@ -49,12 +96,11 @@ st.markdown("""
         min-height: 32px !important;
         transition: 0.2s;
     }
-    section[data-testid="stSidebar"] div.stButton > button:hover {
+    section[data-testid="stSidebar"] div.stButton > button[kind="secondary"]:hover {
         border-color: var(--laranja) !important;
         color: var(--laranja) !important;
         background-color: rgba(247, 148, 30, 0.1) !important;
     }
-
     section[data-testid="stSidebar"] div[data-testid="stDownloadButton"] > button {
         background-color: transparent !important;
         border: 1px solid var(--laranja-escuro) !important;
@@ -70,7 +116,6 @@ st.markdown("""
         background-color: var(--laranja) !important;
         color: #ffffff !important;
     }
-
     div.block-container div[data-testid="stDownloadButton"] > button {
         background-color: transparent !important;
         border: 1px solid #000000 !important;
@@ -103,7 +148,7 @@ st.markdown("""
 # 3. LINK DA PLANILHA
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSQk-RTbvVDPlwxIJFaEKeR1WPRaNSFGioF8DIYD1_mQ-M6a7O20-7TXmx8fBAlDg/pub?gid=502195603&single=true&output=csv"
 
-# 4. FUNÇÃO CAÇADORA DE CABEÇALHOS E BLINDAGEM DE DADOS
+# 4. FUNÇÃO DE CARREGAMENTO E TRATAMENTO
 @st.cache_data(ttl=60)
 def carregar_dados():
     try:
@@ -180,7 +225,7 @@ def gerar_pdf(df_filtrado, wbs_nome, subtitulo):
         if pd.isna(texto) or str(texto).strip().upper() in ['NAN', 'NONE', '']: return "-"
         return str(texto).encode('latin-1', 'replace').decode('latin-1')
 
-    titulo = f"Relatório de Captações - WBS: {wbs_nome}" if wbs_nome else "Relatório Geral de Captações (Toda a Obra)"
+    titulo = f"Relatório de Captações - WBS: {wbs_nome}" if wbs_nome else "Relatório Geral de Captações"
     
     pdf.set_font("Helvetica", 'B', 16)
     pdf.set_text_color(0, 0, 0)
@@ -199,7 +244,6 @@ def gerar_pdf(df_filtrado, wbs_nome, subtitulo):
     pdf.set_fill_color(0, 51, 102) 
     pdf.set_text_color(255, 255, 255)
     
-    # LARGURAS (Total de 277)
     pdf.cell(w=12, h=8, txt="ID", border=1, fill=True, align='C')
     pdf.cell(w=50, h=8, txt="NOME DO PROPRIETARIO", border=1, fill=True, align='C')
     pdf.cell(w=35, h=8, txt="CONTRATO", border=1, fill=True, align='C')
@@ -247,8 +291,12 @@ def gerar_pdf(df_filtrado, wbs_nome, subtitulo):
 # 6. CABEÇALHO DA INTERFACE
 col_texto, col_logo = st.columns([1.8, 1]) 
 with col_texto:
-    st.markdown('<p class="titulo-principal">💧 Monitoramento das Captações - EIXO LESTE</p>', unsafe_allow_html=True)
-    st.markdown('<p class="subtitulo">Sistema de Consulta e Fiscalização - PISF</p>', unsafe_allow_html=True)
+    titulo_header = "Monitoramento das Captações PISF"
+    if st.session_state.eixo_selecionado and st.session_state.modo_exibicao == 'dashboard_eixo':
+        titulo_header += f" - {st.session_state.eixo_selecionado.upper()}"
+        
+    st.markdown(f'<p class="titulo-principal">💧 {titulo_header}</p>', unsafe_allow_html=True)
+    st.markdown('<p class="subtitulo">Sistema de Consulta e Fiscalização</p>', unsafe_allow_html=True)
 with col_logo:
     try:
         st.image("logo.png", use_container_width=True)
@@ -269,6 +317,7 @@ if not df.empty:
     mask_inativas = serie_sit.str.contains('DESATI|NÃO INST|NAO INST', na=False)
     mask_agreste = serie_locais.str.contains('AGRESTE', na=False)
     mask_leste = serie_locais.str.contains('LESTE', na=False)
+    mask_norte = serie_eixo.str.contains('NORTE', na=False)
 
     serie_placa = extrator_seguro(df, ['PLACA INSTALADA', 'PLACA'])
     mask_placa = serie_placa.str.contains('SIM|X|S', na=False)
@@ -276,6 +325,14 @@ if not df.empty:
 
     # 7. BARRA LATERAL (MENU E GERADOR DE RELATÓRIOS)
     with st.sidebar:
+        
+        if st.button("🏠 PONTOS PISF (EIXOS)", use_container_width=True):
+            st.session_state.modo_exibicao = 'home'
+            st.session_state.eixo_selecionado = None
+            st.session_state.input_busca = ""
+            
+        st.markdown("---")
+        
         st.markdown(f"<h2 style='color: #ffa500; margin-bottom:5px; font-size: 18px;'>BUSCAR CAPTAÇÃO</h2>", unsafe_allow_html=True)
         tipo_busca = st.radio("Método de busca:", ["Por ID", "Por Proprietário", "Por Estrutura (WBS)"], label_visibility="collapsed")
         
@@ -283,11 +340,13 @@ if not df.empty:
         if busca.strip() != "":
             st.session_state.input_busca = busca
             st.session_state.modo_exibicao = 'busca'
+            st.session_state.eixo_selecionado = None
             
         st.markdown("---")
         
-        if st.button("ABRIR PAINEL DE INDICADORES", use_container_width=True):
+        if st.button("ABRIR PAINEL DE INDICADORES (GERAL)", use_container_width=True):
             st.session_state.modo_exibicao = 'dashboard'
+            st.session_state.eixo_selecionado = None
             st.session_state.input_busca = "" 
 
         if st.button("PONTOS IRREGULARES POR ESTRUTURA", use_container_width=True):
@@ -313,6 +372,12 @@ if not df.empty:
             
             if st.button("PROCESSAR E GERAR PDF", use_container_width=True):
                 df_pdf = df.copy()
+                
+                if st.session_state.eixo_selecionado:
+                    if st.session_state.eixo_selecionado == 'Leste': df_pdf = df_pdf[mask_leste]
+                    elif st.session_state.eixo_selecionado == 'Norte': df_pdf = df_pdf[mask_norte]
+                    elif st.session_state.eixo_selecionado == 'Ramal do Agreste': df_pdf = df_pdf[mask_agreste]
+
                 if wbs_relatorio.strip() != "":
                     col_wbs = extrator_seguro(df_pdf, ['ESTRUTURA (WBS)', 'ESTRUTURA'])
                     df_pdf = df_pdf[col_wbs.str.contains(wbs_relatorio.strip(), case=False, na=False)]
@@ -330,7 +395,9 @@ if not df.empty:
                     st.error("Nenhum ponto encontrado com esses filtros.")
                 else:
                     st.success(f"Pronto! {len(df_pdf)} pontos processados.")
-                    subtitulo = f"Contrato: {filtro_contrato} | Operação: {filtro_operacao} | Ordem: Estaca"
+                    
+                    eixo_str = f"[{st.session_state.eixo_selecionado}] " if st.session_state.eixo_selecionado else ""
+                    subtitulo = f"{eixo_str}Contrato: {filtro_contrato} | Operação: {filtro_operacao} | Ordem: Estaca"
                     pdf_bytes = gerar_pdf(df_pdf, wbs_relatorio.strip(), subtitulo)
                     
                     st.download_button(
@@ -342,14 +409,82 @@ if not df.empty:
                     )
         
         st.caption(f"<div style='margin-top:20px'>Base Total: **{len(df)} registros**</div>", unsafe_allow_html=True)
-        st.markdown('<div class="assinatura-app">App por Raphael Davi - Versão 1.0 E</div>', unsafe_allow_html=True)
+        st.markdown('<div class="assinatura-app">App por Raphael Davi - Versão 2.0</div>', unsafe_allow_html=True)
+
+    def card_metrica(titulo, valor): return f'<div class="metric-box"><div class="metric-title">{titulo}</div><div class="metric-value">{valor}</div></div>'
 
     # ==========================================================
-    # TELA 1: DASHBOARD DE INDICADORES GERAIS
+    # TELA 0: HOME (SELEÇÃO DE EIXOS COM BOTOES IDÊNTICOS AOS CARDS)
     # ==========================================================
-    if st.session_state.modo_exibicao == 'dashboard':
-        st.markdown("<h2 style='color: #00AEEF;'>Painel Geral de Indicadores</h2>", unsafe_allow_html=True)
-        def card_metrica(titulo, valor): return f'<div class="metric-box"><div class="metric-title">{titulo}</div><div class="metric-value">{valor}</div></div>'
+    if st.session_state.modo_exibicao == 'home':
+        st.markdown("<h2 style='text-align: center; color: #003366; margin-bottom: 40px;'>Selecione o Eixo para visualizar os indicadores:</h2>", unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns(3)
+        
+        # Uso do type="primary" exato para acionar o nosso CSS blindado sem sumir o botão.
+        with col1:
+            if st.button("EIXO NORTE", type="primary", use_container_width=True):
+                st.session_state.eixo_selecionado = 'Norte'
+                st.session_state.modo_exibicao = 'dashboard_eixo'
+                st.rerun()
+                
+        with col2:
+            if st.button("EIXO LESTE", type="primary", use_container_width=True):
+                st.session_state.eixo_selecionado = 'Leste'
+                st.session_state.modo_exibicao = 'dashboard_eixo'
+                st.rerun()
+                
+        with col3:
+            if st.button("RAMAL DO AGRESTE", type="primary", use_container_width=True):
+                st.session_state.eixo_selecionado = 'Ramal do Agreste'
+                st.session_state.modo_exibicao = 'dashboard_eixo'
+                st.rerun()
+
+    # ==========================================================
+    # TELA 1.1: DASHBOARD ESPECÍFICO DE UM EIXO
+    # ==========================================================
+    elif st.session_state.modo_exibicao == 'dashboard_eixo':
+        eixo_str = st.session_state.eixo_selecionado
+        st.markdown(f"<h2 style='color: #00AEEF;'>Painel de Indicadores - {eixo_str.upper()}</h2>", unsafe_allow_html=True)
+        
+        if eixo_str == 'Norte': df_eixo = df[mask_norte]
+        elif eixo_str == 'Leste': df_eixo = df[mask_leste]
+        else: df_eixo = df[mask_agreste]
+        
+        mask_reg_e = df_eixo['IS_REGULAR'] == True
+        mask_irreg_e = df_eixo['IS_REGULAR'] == False
+        
+        serie_sit_e = extrator_seguro(df_eixo, ['SITUAÇÃO', 'SITUACAO'])
+        mask_operando_e = serie_sit_e.str.contains('OPERA', na=False)
+        mask_inativas_e = serie_sit_e.str.contains('DESATI|NÃO INST|NAO INST', na=False)
+        
+        serie_placa_e = extrator_seguro(df_eixo, ['PLACA INSTALADA', 'PLACA'])
+        mask_placa_e = serie_placa_e.str.contains('SIM|X|S', na=False)
+        
+        mask_padronizadas_e = df_eixo.apply(lambda r: str(r.get('OBSERVAÇÃO CPISF', r.get('OBSERVACAO CPISF', ''))).strip() == "Captação padronizada instalada.", axis=1)
+
+        colA, colB, colC = st.columns(3)
+        with colA: st.markdown(card_metrica(f"QUANTIDADE DE PONTOS - {eixo_str.upper()}", len(df_eixo)), unsafe_allow_html=True)
+        with colB: st.markdown(card_metrica("TOTAL COM CONTRATO", len(df_eixo[mask_reg_e])), unsafe_allow_html=True)
+        with colC: st.markdown(card_metrica("TOTAL SEM CONTRATO", len(df_eixo[mask_irreg_e])), unsafe_allow_html=True)
+        
+        colD, colE, colF = st.columns(3)
+        with colD: st.markdown(card_metrica("COM CONTRATO (OPERANDO)", len(df_eixo[mask_reg_e & mask_operando_e])), unsafe_allow_html=True)
+        with colE: st.markdown(card_metrica("COM CONTRATO (NÃO INSTALADO)", len(df_eixo[mask_reg_e & mask_inativas_e])), unsafe_allow_html=True)
+        with colF: st.markdown(card_metrica("SEM CONTRATO (OPERANDO)", len(df_eixo[mask_irreg_e & mask_operando_e])), unsafe_allow_html=True)
+        
+        colG, colH, colI = st.columns(3)
+        with colG: st.markdown(card_metrica("SEM CONTRATO (DESATIVADO)", len(df_eixo[mask_irreg_e & mask_inativas_e])), unsafe_allow_html=True)
+        with colH: st.markdown(card_metrica("CAPTAÇÕES COM PLACA INSTALADA", len(df_eixo[mask_placa_e])), unsafe_allow_html=True)
+        with colI: st.markdown(card_metrica("CAPTAÇÕES PADRONIZADAS", len(df_eixo[mask_padronizadas_e])), unsafe_allow_html=True)
+
+
+    # ==========================================================
+    # TELA 1: DASHBOARD DE INDICADORES GERAIS (LINHAS REORGANIZADAS)
+    # ==========================================================
+    elif st.session_state.modo_exibicao == 'dashboard':
+        st.markdown("<h2 style='color: #00AEEF;'>Painel Geral de Indicadores (Toda a Obra)</h2>", unsafe_allow_html=True)
+        
         colA, colB, colC = st.columns(3)
         with colA: st.markdown(card_metrica("QUANTIDADE DE PONTOS - GERAL", len(df)), unsafe_allow_html=True)
         with colB: st.markdown(card_metrica("TOTAL COM CONTRATO", len(df[mask_reg])), unsafe_allow_html=True)
@@ -360,15 +495,18 @@ if not df.empty:
         with colE: st.markdown(card_metrica("TOTAL COM CONTRATO (NÃO INSTALADO)", len(df[mask_reg & mask_inativas])), unsafe_allow_html=True)
         with colF: st.markdown(card_metrica("TOTAL SEM CONTRATO (OPERANDO)", len(df[mask_irreg & mask_operando])), unsafe_allow_html=True)
         
+        # Antiga linha 4 agora é a 3
         colG, colH, colI = st.columns(3)
         with colG: st.markdown(card_metrica("TOTAL SEM CONTRATO (DESATIVADO)", len(df[mask_irreg & mask_inativas])), unsafe_allow_html=True)
-        with colH: st.markdown(card_metrica("TOTAL DE PONTOS RAMAL DO AGRESTE", len(df[mask_agreste])), unsafe_allow_html=True)
-        with colI: st.markdown(card_metrica("TOTAL DE PONTOS EIXO LESTE", len(df[mask_leste])), unsafe_allow_html=True)
-
+        with colH: st.markdown(card_metrica("CAPTAÇÕES COM PLACA INSTALADA", len(df[mask_placa])), unsafe_allow_html=True)
+        with colI: st.markdown(card_metrica("CAPTAÇÕES PADRONIZADAS", len(df[mask_padronizadas])), unsafe_allow_html=True)
+        
+        # Antiga linha 3 agora é a 4 (Métricas dos Eixos)
         colJ, colK, colL = st.columns(3)
-        with colJ: st.markdown(card_metrica("CAPTAÇÕES COM PLACA INSTALADA", len(df[mask_placa])), unsafe_allow_html=True)
-        with colK: st.markdown(card_metrica("CAPTAÇÕES PADRONIZADAS", len(df[mask_padronizadas])), unsafe_allow_html=True)
-        with colL: st.empty()
+        with colJ: st.markdown(card_metrica("TOTAL DE PONTOS EIXO NORTE", len(df[mask_norte])), unsafe_allow_html=True)
+        with colK: st.markdown(card_metrica("TOTAL DE PONTOS EIXO LESTE", len(df[mask_leste])), unsafe_allow_html=True)
+        with colL: st.markdown(card_metrica("TOTAL DE PONTOS RAMAL DO AGRESTE", len(df[mask_agreste])), unsafe_allow_html=True)
+
 
     # ==========================================================
     # TELA 2: TELA DE IRREGULARES POR WBS COM QUADRINHOS
@@ -379,13 +517,18 @@ if not df.empty:
         st.markdown("---")
         
         df_irregulares = df[mask_irreg].copy()
+        
+        if st.session_state.eixo_selecionado:
+            if st.session_state.eixo_selecionado == 'Leste': df_irregulares = df_irregulares[mask_leste]
+            elif st.session_state.eixo_selecionado == 'Norte': df_irregulares = df_irregulares[mask_norte]
+            elif st.session_state.eixo_selecionado == 'Ramal do Agreste': df_irregulares = df_irregulares[mask_agreste]
+
         col_wbs_irreg = extrator_seguro(df_irregulares, ['ESTRUTURA (WBS)', 'ESTRUTURA'])
         df_irregulares['WBS_CLEAN'] = col_wbs_irreg
-        
         contagem_wbs = df_irregulares['WBS_CLEAN'].value_counts()
         
         if contagem_wbs.empty:
-            st.success("🎉 Excelente! Não há nenhum ponto irregular cadastrado na base de dados no momento.")
+            st.success("🎉 Excelente! Não há nenhum ponto irregular nesta seleção.")
         else:
             cols = st.columns(4)
             for i, (wbs_nome, qtde) in enumerate(contagem_wbs.items()):
@@ -414,7 +557,7 @@ if not df.empty:
                     st.markdown("<br>", unsafe_allow_html=True)
 
     # ==========================================================
-    # TELA BOTOES ADICIONAIS: PLACAS (EM QUADRINHOS)
+    # TELA BOTOES ADICIONAIS: PLACAS
     # ==========================================================
     elif st.session_state.modo_exibicao == 'placas':
         st.markdown("<h2 style='color: #00AEEF;'>📋 Monitor de Pontos com Placa Instalada por Estrutura (WBS)</h2>", unsafe_allow_html=True)
@@ -422,13 +565,18 @@ if not df.empty:
         st.markdown("---")
         
         df_placas = df[mask_placa].copy()
+        
+        if st.session_state.eixo_selecionado:
+            if st.session_state.eixo_selecionado == 'Leste': df_placas = df_placas[mask_leste]
+            elif st.session_state.eixo_selecionado == 'Norte': df_placas = df_placas[mask_norte]
+            elif st.session_state.eixo_selecionado == 'Ramal do Agreste': df_placas = df_placas[mask_agreste]
+
         col_wbs_placas = extrator_seguro(df_placas, ['ESTRUTURA (WBS)', 'ESTRUTURA'])
         df_placas['WBS_CLEAN'] = col_wbs_placas
-        
         contagem_wbs = df_placas['WBS_CLEAN'].value_counts()
         
         if contagem_wbs.empty:
-            st.info("Nenhum ponto com placa instalada encontrado.")
+            st.info("Nenhum ponto com placa instalada encontrado nesta seleção.")
         else:
             cols = st.columns(4)
             for i, (wbs_nome, qtde) in enumerate(contagem_wbs.items()):
@@ -457,7 +605,7 @@ if not df.empty:
                     st.markdown("<br>", unsafe_allow_html=True)
 
     # ==========================================================
-    # TELA BOTOES ADICIONAIS: PADRONIZADAS (EM QUADRINHOS)
+    # TELA BOTOES ADICIONAIS: PADRONIZADAS
     # ==========================================================
     elif st.session_state.modo_exibicao == 'padronizadas':
         st.markdown("<h2 style='color: #28A745;'>🛠️ Monitor de Captações Padronizadas por Estrutura (WBS)</h2>", unsafe_allow_html=True)
@@ -465,13 +613,18 @@ if not df.empty:
         st.markdown("---")
         
         df_padrao = df[mask_padronizadas].copy()
+        
+        if st.session_state.eixo_selecionado:
+            if st.session_state.eixo_selecionado == 'Leste': df_padrao = df_padrao[mask_leste]
+            elif st.session_state.eixo_selecionado == 'Norte': df_padrao = df_padrao[mask_norte]
+            elif st.session_state.eixo_selecionado == 'Ramal do Agreste': df_padrao = df_padrao[mask_agreste]
+
         col_wbs_padrao = extrator_seguro(df_padrao, ['ESTRUTURA (WBS)', 'ESTRUTURA'])
         df_padrao['WBS_CLEAN'] = col_wbs_padrao
-        
         contagem_wbs = df_padrao['WBS_CLEAN'].value_counts()
         
         if contagem_wbs.empty:
-            st.info("Nenhuma captação padronizada encontrada.")
+            st.info("Nenhuma captação padronizada encontrada nesta seleção.")
         else:
             cols = st.columns(4)
             for i, (wbs_nome, qtde) in enumerate(contagem_wbs.items()):
