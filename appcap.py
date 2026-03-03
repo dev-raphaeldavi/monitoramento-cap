@@ -18,13 +18,6 @@ def limpar_pesquisa():
     st.session_state.widget_busca = ""
     st.session_state.input_busca = ""
 
-# FUNÇÃO AJUSTADA PARA CORRIGIR O CLIQUE NAS REGIÕES
-def selecionar_eixo_home(eixo):
-    st.session_state.widget_busca = ""
-    st.session_state.input_busca = ""
-    st.session_state.eixo_selecionado = eixo
-    st.session_state.modo_exibicao = 'dashboard_eixo'
-
 # 2. IDENTIDADE VISUAL E CSS CUSTOMIZADO BLINDADO
 st.markdown("""
     <style>
@@ -392,8 +385,8 @@ if not df.empty:
                     col_wbs = extrator_seguro(df_pdf, ['ESTRUTURA (WBS)', 'ESTRUTURA'])
                     df_pdf = df_pdf[col_wbs.str.contains(wbs_relatorio.strip(), case=False, na=False)]
                 
-                if filtro_contrato == "Apenas Regulares": df_pdf = df_pdf[df_pdf['IS_REGULAR'] == True]
-                elif filtro_contrato == "Apenas Irregulares": df_pdf = df_pdf[df_pdf['IS_REGULAR'] == False]
+                if filtro_contrato == "Com Contrato": df_pdf = df_pdf[df_pdf['IS_REGULAR'] == True]
+                elif filtro_contrato == "Sem Contrato": df_pdf = df_pdf[df_pdf['IS_REGULAR'] == False]
                 
                 sit_pdf = extrator_seguro(df_pdf, ['SITUAÇÃO', 'SITUACAO'])
                 if filtro_operacao == "Em Operação":
@@ -432,13 +425,19 @@ if not df.empty:
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.button("EIXO NORTE", type="primary", use_container_width=True, on_click=selecionar_eixo_home, args=('Norte',))
+            if st.button("EIXO NORTE", type="primary", use_container_width=True, on_click=limpar_pesquisa):
+                st.session_state.eixo_selecionado = 'Norte'
+                st.session_state.modo_exibicao = 'dashboard_eixo'
                 
         with col2:
-            st.button("EIXO LESTE", type="primary", use_container_width=True, on_click=selecionar_eixo_home, args=('Leste',))
+            if st.button("EIXO LESTE", type="primary", use_container_width=True, on_click=limpar_pesquisa):
+                st.session_state.eixo_selecionado = 'Leste'
+                st.session_state.modo_exibicao = 'dashboard_eixo'
                 
         with col3:
-            st.button("RAMAL DO AGRESTE", type="primary", use_container_width=True, on_click=selecionar_eixo_home, args=('Ramal do Agreste',))
+            if st.button("RAMAL DO AGRESTE", type="primary", use_container_width=True, on_click=limpar_pesquisa):
+                st.session_state.eixo_selecionado = 'Ramal do Agreste'
+                st.session_state.modo_exibicao = 'dashboard_eixo'
 
     # ==========================================================
     # TELA 1.1: DASHBOARD ESPECÍFICO DE UM EIXO
@@ -592,7 +591,7 @@ if not df.empty:
                     """, unsafe_allow_html=True)
                     
                     df_wbs_especifica = df_placas[df_placas['WBS_CLEAN'] == wbs_nome]
-                    pdf_bytes_wbs = gerar_pdf(df_placas, wbs_label, "Com Placa Instalada | Ordem: Estaca")
+                    pdf_bytes_wbs = gerar_pdf(df_wbs_especifica, wbs_label, "Com Placa Instalada | Ordem: Estaca")
                     
                     st.download_button(
                         label=f"BAIXAR PDF ({wbs_label})",
@@ -722,4 +721,3 @@ if not df.empty:
 
 else:
     st.info("🔄 Carregando dados do servidor Google Drive...")
-
