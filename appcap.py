@@ -377,7 +377,7 @@ if not df.empty:
         
         with st.expander("Abrir Filtros de Relatório", expanded=False):
             wbs_relatorio = st.text_input("Estrutura (WBS) - Opcional:", placeholder="Deixe branco p/ GERAL")
-            filtro_contrato = st.selectbox("Contrato:", ["Todos", "Apenas Regulares", "Apenas Irregulares"])
+            filtro_contrato = st.selectbox("Contrato:", ["Todos", "Com Contrato", "Sem Contrato"])
             filtro_operacao = st.selectbox("Situação:", ["Todas", "Em Operação", "Não Instalados/Desativados"])
             
             if st.button("PROCESSAR E GERAR PDF", use_container_width=True):
@@ -722,3 +722,4 @@ if not df.empty:
 
 else:
     st.info("🔄 Carregando dados do servidor Google Drive...")
+
