@@ -90,7 +90,8 @@ st.markdown("""
     }
 
     /* Estilos Gerais (Barra Lateral e outros botões) */
-    section[data-testid="stSidebar"] div.stButton > button[kind="secondary"] {
+    section[data-testid="stSidebar"] div.stButton > button[kind="secondary"],
+    section[data-testid="stSidebar"] div[data-testid="stLinkButton"] > a {
         background-color: transparent !important;
         border: 1px solid var(--laranja-escuro) !important;
         color: var(--laranja-escuro) !important;
@@ -101,8 +102,13 @@ st.markdown("""
         box-shadow: none !important;
         min-height: 32px !important;
         transition: 0.2s;
+        text-decoration: none !important;
+        display: flex;
+        justify-content: center;
+        align-items: center;
     }
-    section[data-testid="stSidebar"] div.stButton > button[kind="secondary"]:hover {
+    section[data-testid="stSidebar"] div.stButton > button[kind="secondary"]:hover,
+    section[data-testid="stSidebar"] div[data-testid="stLinkButton"] > a:hover {
         border-color: var(--laranja) !important;
         color: var(--laranja) !important;
         background-color: rgba(247, 148, 30, 0.1) !important;
@@ -329,6 +335,10 @@ if not df.empty:
     mask_placa = serie_placa.str.contains('SIM|X|S', na=False)
     mask_padronizadas = df.apply(lambda r: str(r.get('OBSERVAÇÃO CPISF', r.get('OBSERVACAO CPISF', ''))).strip() == "Captação padronizada instalada.", axis=1)
 
+    # NOVO: MASCARA MATERIAL COMPRADO
+    serie_material = extrator_seguro(df, ['MATERIAL COMPRADO', 'MATERIAL'])
+    mask_material_sim = serie_material.str.contains('SIM|X|S', na=False)
+
     # 7. BARRA LATERAL (MENU E GERADOR DE RELATÓRIOS)
     with st.sidebar:
         
@@ -363,6 +373,18 @@ if not df.empty:
             
         if st.button("PONTOS COM INSTALAÇÃO PADRONIZADA", use_container_width=True, on_click=limpar_pesquisa):
             st.session_state.modo_exibicao = 'padronizadas'
+
+        # NOVO: BOTAO PONTOS JÁ COM MATERIAIS
+        if st.button("PONTOS JÁ COM MATERIAIS", use_container_width=True, on_click=limpar_pesquisa):
+            st.session_state.modo_exibicao = 'materiais'
+            
+        st.markdown("---")
+        
+        # ==========================================================
+        # NOVO: LINK EXTERNO PARA O EMISSOR DE TERMOS
+        # ==========================================================
+        st.markdown(f"<h2 style='color: #ffa500; margin-bottom:5px; font-size: 18px;'>FERRAMENTAS EXTERNAS</h2>", unsafe_allow_html=True)
+        st.link_button("📝 EMISSOR DE TERMOS (NOVA GUIA)", "https://emitirtermo-rcykhrjdx7iakqzkexzxrp.streamlit.app/", use_container_width=True)
         
         st.markdown("---")
         
@@ -372,6 +394,8 @@ if not df.empty:
             wbs_relatorio = st.text_input("Estrutura (WBS) - Opcional:", placeholder="Deixe branco p/ GERAL")
             filtro_contrato = st.selectbox("Contrato:", ["Todos", "Com Contrato", "Sem Contrato"])
             filtro_operacao = st.selectbox("Situação:", ["Todas", "Em Operação", "Não Instalados/Desativados"])
+            # NOVO: FILTRO MATERIAL COMPRADO
+            filtro_material = st.selectbox("Material Comprado:", ["Todos", "Sim", "Não"])
             
             if st.button("PROCESSAR E GERAR PDF", use_container_width=True):
                 df_pdf = df.copy()
@@ -393,6 +417,13 @@ if not df.empty:
                     df_pdf = df_pdf[sit_pdf.str.contains('OPERA', na=False)]
                 elif filtro_operacao == "Não Instalados/Desativados":
                     df_pdf = df_pdf[sit_pdf.str.contains('DESATI|NÃO INST|NAO INST', na=False)]
+
+                # NOVO: LÓGICA DO FILTRO DE MATERIAL NO PDF
+                mat_pdf = extrator_seguro(df_pdf, ['MATERIAL COMPRADO', 'MATERIAL'])
+                if filtro_material == "Sim":
+                    df_pdf = df_pdf[mat_pdf.str.contains('SIM|X|S', na=False)]
+                elif filtro_material == "Não":
+                    df_pdf = df_pdf[~mat_pdf.str.contains('SIM|X|S', na=False)]
                 
                 if df_pdf.empty:
                     st.error("Nenhum ponto encontrado com esses filtros.")
@@ -400,11 +431,12 @@ if not df.empty:
                     st.success(f"Pronto! {len(df_pdf)} pontos processados.")
                     
                     eixo_str = f"[{st.session_state.eixo_selecionado}] " if st.session_state.eixo_selecionado else ""
-                    subtitulo = f"{eixo_str}Contrato: {filtro_contrato} | Operação: {filtro_operacao} | Ordem: Estaca"
+                    # Atualizado subtitulo para mostrar também a seleção de Material
+                    subtitulo = f"{eixo_str}Contrato: {filtro_contrato} | Operação: {filtro_operacao} | Material: {filtro_material} | Ordem: Estaca"
                     pdf_bytes = gerar_pdf(df_pdf, wbs_relatorio.strip(), subtitulo)
                     
                     st.download_button(
-                        label=f"BAIXAR PDF AGORA",
+                        label=f"BAIXAR PDF",
                         data=pdf_bytes,
                         file_name=f"Relatorio_{'WBS_'+wbs_relatorio.strip() if wbs_relatorio.strip() else 'GERAL'}.pdf",
                         mime="application/pdf",
@@ -542,11 +574,11 @@ if not df.empty:
                         </div>
                     """, unsafe_allow_html=True)
                     
-                    df_wbs_especifica = df_irregulares[df_irregulares['WBS_CLEAN'] == wbs_nome]
+                    df_wbs_especifica = df_irregulares[df_wbs_especifica['WBS_CLEAN'] == wbs_nome]
                     pdf_bytes_wbs = gerar_pdf(df_wbs_especifica, wbs_label, "Apenas Irregulares | Ordem: Estaca")
                     
                     st.download_button(
-                        label=f"BAIXAR PDF ({wbs_label})",
+                        label=f"BAIXAR PDF",
                         data=pdf_bytes_wbs,
                         file_name=f"Irregulares_WBS_{wbs_label}.pdf",
                         mime="application/pdf",
@@ -594,7 +626,7 @@ if not df.empty:
                     pdf_bytes_wbs = gerar_pdf(df_wbs_especifica, wbs_label, "Com Placa Instalada | Ordem: Estaca")
                     
                     st.download_button(
-                        label=f"BAIXAR PDF ({wbs_label})",
+                        label=f"BAIXAR PDF",
                         data=pdf_bytes_wbs,
                         file_name=f"Placas_WBS_{wbs_label}.pdf",
                         mime="application/pdf",
@@ -642,13 +674,69 @@ if not df.empty:
                     pdf_bytes_wbs = gerar_pdf(df_wbs_especifica, wbs_label, "Captações Padronizadas | Ordem: Estaca")
                     
                     st.download_button(
-                        label=f"BAIXAR PDF ({wbs_label})",
+                        label=f"BAIXAR PDF",
                         data=pdf_bytes_wbs,
                         file_name=f"Padronizadas_WBS_{wbs_label}.pdf",
                         mime="application/pdf",
                         use_container_width=True,
                         key=f"dl_padrao_wbs_{i}"
                     )
+                    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ==========================================================
+    # NOVO: TELA BOTOES ADICIONAIS: MATERIAIS
+    # ==========================================================
+    elif st.session_state.modo_exibicao == 'materiais':
+        st.markdown("<h2 style='color: #F7941E;'>📦 Monitor de Pontos por Material Comprado na Estrutura (WBS)</h2>", unsafe_allow_html=True)
+        st.markdown('<p style="color: black;">Abaixo estão listadas as estruturas detalhando o quantitativo de pontos que possuem (SIM) e não possuem (NÃO) material comprado. Clique no botão de download para gerar o relatório apenas com os pontos que JÁ POSSUEM material.</p>', unsafe_allow_html=True)
+        st.markdown("---")
+        
+        df_materiais = df.copy()
+        if st.session_state.eixo_selecionado:
+            if st.session_state.eixo_selecionado == 'Leste': df_materiais = df_materiais[mask_leste]
+            elif st.session_state.eixo_selecionado == 'Norte': df_materiais = df_materiais[mask_norte]
+            elif st.session_state.eixo_selecionado == 'Ramal do Agreste': df_materiais = df_materiais[mask_agreste]
+
+        col_wbs_mat = extrator_seguro(df_materiais, ['ESTRUTURA (WBS)', 'ESTRUTURA'])
+        df_materiais['WBS_CLEAN'] = col_wbs_mat
+        
+        wbs_unicos = df_materiais['WBS_CLEAN'].unique()
+        wbs_unicos = [w for w in wbs_unicos if str(w).strip() != "" and str(w).strip().upper() != "NAN"]
+        
+        if len(wbs_unicos) == 0:
+            st.info("Nenhuma estrutura encontrada nesta seleção.")
+        else:
+            cols = st.columns(4)
+            for i, wbs_nome in enumerate(sorted(wbs_unicos)):
+                df_wbs_especifica = df_materiais[df_materiais['WBS_CLEAN'] == wbs_nome]
+                
+                serie_mat_wbs = extrator_seguro(df_wbs_especifica, ['MATERIAL COMPRADO', 'MATERIAL'])
+                qtd_sim = len(df_wbs_especifica[serie_mat_wbs.str.contains('SIM|X|S', na=False)])
+                qtd_nao = len(df_wbs_especifica) - qtd_sim
+                
+                with cols[i % 4]:
+                    st.markdown(f"""
+                        <div class="metric-box" style="height: auto; padding: 15px; margin-bottom: 15px;">
+                            <div class="metric-title" style="margin-bottom: 5px; font-size: 15px;">WBS: {wbs_nome}</div>
+                            <div style="font-size: 18px; font-weight: bold; color: #28A745; margin-bottom: 5px;">✅ Com Material: {qtd_sim}</div>
+                            <div style="font-size: 18px; font-weight: bold; color: #FF4B4B;">❌ Sem Material: {qtd_nao}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    df_wbs_sim = df_wbs_especifica[serie_mat_wbs.str.contains('SIM|X|S', na=False)]
+                    if not df_wbs_sim.empty:
+                        pdf_bytes_wbs = gerar_pdf(df_wbs_sim, wbs_nome, "Com Material Comprado | Ordem: Estaca")
+                        st.download_button(
+                            label=f"BAIXAR PDF",
+                            data=pdf_bytes_wbs,
+                            file_name=f"Materiais_WBS_{wbs_nome}.pdf",
+                            mime="application/pdf",
+                            use_container_width=True,
+                            key=f"dl_mat_wbs_{i}"
+                        )
+                    else:
+                        st.button("SEM MATERIAL", disabled=True, key=f"dl_mat_wbs_dis_{i}", use_container_width=True)
+                        
                     st.markdown("<br>", unsafe_allow_html=True)
 
     # ==========================================================
