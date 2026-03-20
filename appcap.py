@@ -460,16 +460,19 @@ if not df.empty:
             if st.button("EIXO NORTE", type="primary", use_container_width=True, on_click=limpar_pesquisa):
                 st.session_state.eixo_selecionado = 'Norte'
                 st.session_state.modo_exibicao = 'dashboard_eixo'
+                st.rerun() # FORÇA O RECARREGAMENTO COM APENAS UM CLIQUE
                 
         with col2:
             if st.button("EIXO LESTE", type="primary", use_container_width=True, on_click=limpar_pesquisa):
                 st.session_state.eixo_selecionado = 'Leste'
                 st.session_state.modo_exibicao = 'dashboard_eixo'
+                st.rerun() # FORÇA O RECARREGAMENTO COM APENAS UM CLIQUE
                 
         with col3:
             if st.button("RAMAL DO AGRESTE", type="primary", use_container_width=True, on_click=limpar_pesquisa):
                 st.session_state.eixo_selecionado = 'Ramal do Agreste'
                 st.session_state.modo_exibicao = 'dashboard_eixo'
+                st.rerun() # FORÇA O RECARREGAMENTO COM APENAS UM CLIQUE
 
     # ==========================================================
     # TELA 1.1: DASHBOARD ESPECÍFICO DE UM EIXO
@@ -574,7 +577,7 @@ if not df.empty:
                         </div>
                     """, unsafe_allow_html=True)
                     
-                    df_wbs_especifica = df_irregulares[df_wbs_especifica['WBS_CLEAN'] == wbs_nome]
+                    df_wbs_especifica = df_irregulares[df_irregulares['WBS_CLEAN'] == wbs_nome]
                     pdf_bytes_wbs = gerar_pdf(df_wbs_especifica, wbs_label, "Apenas Irregulares | Ordem: Estaca")
                     
                     st.download_button(
