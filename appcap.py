@@ -677,7 +677,7 @@ if not df.empty:
                     st.markdown("<br>", unsafe_allow_html=True)
 
     # ==========================================================
-    # NOVO: TELA BOTOES ADICIONAIS: MATERIAIS DISPONÍVEIS
+    # TELA BOTOES ADICIONAIS: MATERIAIS DISPONÍVEIS
     # ==========================================================
     elif st.session_state.modo_exibicao == 'materiais':
         st.markdown("<h2 style='color: #F7941E;'>📦 Monitor de Materiais Disponíveis para Instalação (WBS)</h2>", unsafe_allow_html=True)
@@ -696,11 +696,21 @@ if not df.empty:
         wbs_unicos = df_materiais['WBS_CLEAN'].unique()
         wbs_unicos = [w for w in wbs_unicos if str(w).strip() != "" and str(w).strip().upper() != "NAN"]
         
-        if len(wbs_unicos) == 0:
-            st.info("Nenhuma estrutura encontrada nesta seleção.")
+        # ====================================================================
+        # NOVO: PRÉ-FILTRAR PARA EXIBIR APENAS ESTRUTURAS COM MATERIAL COMPRADO
+        # ====================================================================
+        wbs_com_material = []
+        for wbs in wbs_unicos:
+            df_temp = df_materiais[df_materiais['WBS_CLEAN'] == wbs]
+            serie_temp = extrator_seguro(df_temp, ['MATERIAL COMPRADO', 'MATERIAL'])
+            if serie_temp.str.contains('SIM|X|S', na=False).sum() > 0:
+                wbs_com_material.append(wbs)
+        
+        if len(wbs_com_material) == 0:
+            st.info("Nenhuma estrutura com material disponível encontrada nesta seleção.")
         else:
             cols = st.columns(4)
-            for i, wbs_nome in enumerate(sorted(wbs_unicos)):
+            for i, wbs_nome in enumerate(sorted(wbs_com_material)):
                 # Filtra a estrutura específica
                 df_wbs_especifica = df_materiais[df_materiais['WBS_CLEAN'] == wbs_nome]
                 
