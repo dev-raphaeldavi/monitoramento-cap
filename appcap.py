@@ -158,7 +158,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 3. LINK DA PLANILHA
-URL_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSQk-RTbvVDPlwxIJFaEKeR1WPRaNSFGioF8DIYD1_mQ-M6a7O20-7TXmx8fBAlDg/pub?gid=502195603&single=true&output=csv"
+URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1rDWdTJN_R_YngJ1OIdGWi2dULnEFtUGb/edit?usp=sharing&ouid=116802568097558320682&rtpof=true&sd=true"
 
 # 4. FUNÇÃO DE CARREGAMENTO E TRATAMENTO
 @st.cache_data(ttl=60)
